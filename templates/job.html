@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Job {{ job_id }}</title>
+</head>
+<body>
+    <h2>Video Conversion Status</h2>
+
+    <p><b>Job ID:</b> {{ job_id }}</p>
+    <p><b>Status:</b> {{ status }}</p>
+
+    {% if status == "completed" %}
+        <a href="/download/{{ job_id }}">
+            <button>⬇ Download Video</button>
+        </a>
+    {% else %}
+        <p>Please refresh this page after a few moments.</p>
+    {% endif %}
+</body>
+</html>

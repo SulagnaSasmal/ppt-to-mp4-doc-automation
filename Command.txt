@@ -1,0 +1,10 @@
+cd C:\ppt-video-phase1-API
+.\.venv\Scripts\Activate.ps1
+ $env:AZURE_TTS_KEY="Bq2aIyo9iyYDJJoqZRfxKp5EmnRDXdkaQvoZXI21AlezhFQ4bPefJQQJ99BKACYeBjFXJ3w3AAAYACOGl1tC" 
+ $env:AZURE_TTS_REGION="eastus"; 
+ python -m uvicorn app:app --host 127.0.0.1 --port 8000
+
+
+
+
+

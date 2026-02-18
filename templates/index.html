@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PPT → Animated Video</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+
+<body>
+<img src="/static/img/actimize.png" class="logo" />
+
+<div class="container">
+  <!-- Step indicator removed per UI cleanup -->
+  <h1 class="title">PPT → Animated Video with AI Voice</h1>
+
+  <p class="subtitle">
+    Convert PowerPoint presentations into animated MP4 videos using slide animations
+    and AI-generated voice-over narration from speaker notes.
+    and AI-generated voice-over narration from speaker notes.
+  </p>
+
+  <form id="uploadForm" enctype="multipart/form-data">
+    <div class="upload-box">
+      <div class="upload-controls">
+        <input type="file" name="ppt" accept=".ppt,.pptx" required />
+      </div>
+      <p>Upload your PowerPoint (.pptx)</p>
+    </div>
+    <button type="submit">Convert to Video</button>
+  </form>
+
+  <div id="status-section" style="margin-top:20px;">
+    <div id="status-text">Waiting for upload…</div>
+
+    <div class="progress-outer">
+      <div class="progress-inner" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <div id="download-section" style="margin-top:20px;">
+    <button id="download-video" disabled>⬇ Download Video (MP4)</button>
+    <button id="download-log" disabled>📄 Download Log</button>
+  </div>
+  
+  <div style="margin-top:16px;">
+    <button id="reset-btn" class="secondary" onclick="resetTask()">Reset</button>
+  </div>
+</div>
+
+<script>
+let jobId = null;
+
+function setProgress(percent) {
+  const bar = document.getElementById("progress-bar");
+  if (bar) bar.style.width = percent + "%";
+}
+
+document.getElementById("uploadForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fileInput = event.target.querySelector('input[type="file"]');
+  const file = fileInput.files[0];
+  if (!file) {
+    alert("Please select a PPT file");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("ppt", file);
+
+  const res = await fetch("/convert-ui", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+  jobId = data.job_id;
+
+  startPolling(jobId);
+});
+let pollInterval = null;
+
+function updateStatus(data) {
+  const label = document.getElementById("status-text");
+  if (label) label.innerText = `Status: ${data.status}`;
+  const bar = document.getElementById("progress-bar");
+  if (bar) bar.style.width = `${data.progress || 0}%`;
+}
+
+function startPolling(jobId) {
+  pollInterval = setInterval(async () => {
+    const res = await fetch(`/status/${jobId}`);
+    const data = await res.json();
+
+    updateStatus(data);
+
+    // Completion
+    if (data.status === "READY" || data.status === "completed") {
+      clearInterval(pollInterval);
+      enableDownload(data.download_url || `/download/${jobId}`);
+    }
+
+    if (data.status === "FAILED" || data.status === "error") {
+      clearInterval(pollInterval);
+      const label = document.getElementById("status-text");
+      if (label) label.innerText = "Status: Failed (see logs)";
+      
+      // Enable log download on failure
+      const dlLog = document.getElementById("download-log");
+      if (dlLog && jobId) {
+        dlLog.disabled = false;
+        dlLog.onclick = () => window.location.href = `/logs/${jobId}?download=true`;
+      }
+    }
+
+  }, 1500);
+}
+
+function enableDownload(videoUrl) {
+  const dl = document.getElementById("download-video");
+  if (dl) {
+    dl.disabled = false;
+    dl.onclick = () => window.location.href = videoUrl;
+  }
+  
+  // Enable log download
+  const dlLog = document.getElementById("download-log");
+  if (dlLog && jobId) {
+    dlLog.disabled = false;
+    dlLog.onclick = () => window.location.href = `/logs/${jobId}?download=true`;
+  }
+
+  const label = document.getElementById("status-text");
+  if (label) label.innerText = "Status: Ready ✅";
+}
+
+function resetTask() {
+  // Stop polling
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+  
+  // Reset job ID
+  jobId = null;
+  
+  // Reset status bar
+  const label = document.getElementById("status-text");
+  if (label) label.innerText = "Waiting for upload…";
+  
+  // Reset progress bar
+  const bar = document.getElementById("progress-bar");
+  if (bar) bar.style.width = "0%";
+  
+  // Disable download buttons
+  const dl = document.getElementById("download-video");
+  if (dl) {
+    dl.disabled = true;
+    dl.onclick = null;
+  }
+  
+  const dlLog = document.getElementById("download-log");
+  if (dlLog) {
+    dlLog.disabled = true;
+    dlLog.onclick = null;
+  }
+  
+  // Reset file input
+  document.getElementById("uploadForm").reset();
+}
+</script>
+
+</body>
+</html>

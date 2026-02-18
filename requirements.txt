@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pywin32
+requests
+python-pptx
+python-multipart
+jinja2

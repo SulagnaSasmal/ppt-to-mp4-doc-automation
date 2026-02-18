@@ -1,0 +1,8 @@
+{
+  "status": "error",
+  "stage": "upload",
+  "progress": 100,
+  "message": "Conversion failed: 'AZURE_TTS_KEY'",
+  "output": null,
+  "log": "C:\\ppt-video-phase1-API\\jobs\\1f956bca-8ba2-49b7-8abf-4b2f5ded066e\\status.log"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "error",
+  "stage": "upload",
+  "progress": 100,
+  "message": "Conversion failed: (-2147352567, 'Exception occurred.', (0, 'Microsoft PowerPoint', 'Presentation.Close : Failed.', '', 0, -2147467259), None)",
+  "output": null,
+  "log": "C:\\ppt-video-phase1-API\\jobs\\dec4b1a3-3097-4170-a404-d8dc26d368d4\\status.log"
+}

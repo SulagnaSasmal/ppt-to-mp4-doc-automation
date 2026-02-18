@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PPT → Animated Video</title>
+</head>
+<body>
+    <h1>PPT → Animated Video with AI Voice</h1>
+
+    <p>
+        Upload a PowerPoint file.  
+        Slide <b>Notes</b> will be used for voice-over.
+    </p>
+
+    <form action="/convert-ui" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".ppt,.pptx" required />
+        <br><br>
+        <button type="submit">Convert to Video</button>
+    </form>
+</body>
+</html>

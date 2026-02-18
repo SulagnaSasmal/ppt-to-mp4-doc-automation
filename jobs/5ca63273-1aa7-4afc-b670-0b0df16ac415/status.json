@@ -1,0 +1,8 @@
+{
+  "status": "muxing",
+  "stage": "ffmpeg",
+  "progress": 85,
+  "message": "FFmpeg muxing",
+  "output": null,
+  "log": "C:\\ppt-video-phase1-API\\jobs\\5ca63273-1aa7-4afc-b670-0b0df16ac415\\status.log"
+}

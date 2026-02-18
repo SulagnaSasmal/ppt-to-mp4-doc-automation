@@ -1,0 +1,9 @@
+{
+  "status": "completed",
+  "stage": "completed",
+  "progress": 100,
+  "message": "Completed successfully",
+  "output": "C:\\ppt-video-phase1-API\\jobs\\6526536e-cf4e-464f-83c8-2cbd1cc0590a\\final.mp4",
+  "log": "C:\\ppt-video-phase1-API\\jobs\\6526536e-cf4e-464f-83c8-2cbd1cc0590a\\status.log",
+  "final_video_path": "C:\\ppt-video-phase1-API\\jobs\\6526536e-cf4e-464f-83c8-2cbd1cc0590a\\final.mp4"
+}

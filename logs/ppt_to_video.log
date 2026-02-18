@@ -1,0 +1,192 @@
+2026-01-24 14:44:52,480 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 14:44:52,481 | INFO | Step 1: Saving PPT
+2026-01-24 14:44:52,502 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 14:44:52,502 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 14:44:52,502 | INFO | Step 4: FFmpeg muxing
+2026-01-24 14:47:20,175 | INFO | Completed successfully
+2026-01-24 16:56:43,441 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 16:56:43,442 | INFO | Step 1: Saving PPT
+2026-01-24 16:56:43,480 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 16:56:43,481 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 16:56:43,481 | INFO | Step 4: FFmpeg muxing
+2026-01-24 17:01:28,547 | INFO | Completed successfully
+2026-01-24 17:18:49,245 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 17:18:49,245 | INFO | Step 1: Saving PPT
+2026-01-24 17:18:49,268 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 17:18:49,269 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 17:18:49,269 | INFO | Step 4: FFmpeg muxing
+2026-01-24 17:21:41,405 | INFO | Completed successfully
+2026-01-24 18:29:43,784 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 18:29:43,786 | INFO | Step 1: Saving PPT
+2026-01-24 18:29:43,832 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 18:29:43,834 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 18:29:43,835 | INFO | Step 4: FFmpeg muxing
+2026-01-24 18:29:44,395 | ERROR | Conversion failed
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\app.py", line 91, in convert_ppt
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\ppt_pipeline.py", line 67, in run_pipeline
+    azure_key = os.environ["AZURE_TTS_KEY"]
+                ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 679, in __getitem__
+KeyError: 'AZURE_TTS_KEY'
+2026-01-24 18:31:50,787 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 18:31:50,787 | INFO | Step 1: Saving PPT
+2026-01-24 18:31:50,808 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 18:31:50,809 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 18:31:50,809 | INFO | Step 4: FFmpeg muxing
+2026-01-24 18:31:50,811 | ERROR | Conversion failed
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\app.py", line 91, in convert_ppt
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\ppt_pipeline.py", line 67, in run_pipeline
+    azure_key = os.environ["AZURE_TTS_KEY"]
+                ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 679, in __getitem__
+KeyError: 'AZURE_TTS_KEY'
+2026-01-24 18:42:18,372 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 18:42:18,373 | INFO | Step 1: Saving PPT
+2026-01-24 18:42:18,402 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 18:42:18,403 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 18:42:18,403 | INFO | Step 4: FFmpeg muxing
+2026-01-24 18:44:38,010 | INFO | Completed successfully
+2026-01-24 20:51:53,254 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 20:51:53,254 | INFO | Step 1: Saving PPT
+2026-01-24 20:51:53,280 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 20:51:53,284 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 20:51:53,287 | INFO | Step 4: FFmpeg muxing
+2026-01-24 20:55:38,217 | INFO | Completed successfully
+2026-01-24 21:19:23,460 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 21:19:23,460 | INFO | Step 1: Saving PPT
+2026-01-24 21:19:23,507 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 21:19:23,513 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 21:19:23,517 | INFO | Step 4: FFmpeg muxing
+2026-01-24 21:21:56,033 | INFO | Completed successfully
+2026-01-24 23:31:14,881 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-24 23:31:14,883 | INFO | Step 1: Saving PPT
+2026-01-24 23:31:14,934 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-24 23:31:14,944 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-24 23:31:14,953 | INFO | Step 4: FFmpeg muxing
+2026-01-24 23:34:45,539 | INFO | Completed successfully
+2026-01-25 00:19:56,661 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 00:19:56,662 | INFO | Step 1: Saving PPT
+2026-01-25 00:19:56,698 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-25 00:19:56,703 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-25 00:19:56,708 | INFO | Step 4: FFmpeg muxing
+2026-01-25 00:22:38,400 | INFO | Completed successfully
+2026-01-25 00:27:47,266 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 00:27:47,266 | INFO | Step 1: Saving PPT
+2026-01-25 00:27:47,300 | INFO | Step 2: Generating animated video via PowerPoint
+2026-01-25 00:27:47,305 | INFO | Step 3: Generating Azure TTS from notes
+2026-01-25 00:27:47,309 | INFO | Step 4: FFmpeg muxing
+2026-01-25 00:33:31,172 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 00:33:31,245 | INFO | [b04ca5aa-5108-4ab5-8b43-aed43c5b484f] Step 1: Exporting animated video
+2026-01-25 00:33:31,245 | INFO | [b04ca5aa-5108-4ab5-8b43-aed43c5b484f] Background conversion started for: my_presentation.pptx
+2026-01-25 00:33:31,263 | INFO | [b04ca5aa-5108-4ab5-8b43-aed43c5b484f] Step 2: Generating animated video via PowerPoint
+2026-01-25 00:33:31,271 | INFO | [b04ca5aa-5108-4ab5-8b43-aed43c5b484f] Step 3: Generating Azure TTS from notes
+2026-01-25 00:33:31,282 | INFO | [b04ca5aa-5108-4ab5-8b43-aed43c5b484f] Step 4: FFmpeg muxing
+2026-01-25 00:34:13,463 | ERROR | [b04ca5aa-5108-4ab5-8b43-aed43c5b484f] Conversion failed
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\dynamic.py", line 81, in _GetGoodDispatch
+    IDispatch = pythoncom.connect(IDispatch)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pywintypes.com_error: (-2147221008, 'CoInitialize has not been called.', None, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\app.py", line 121, in run_conversion_async
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\ppt_pipeline.py", line 108, in run_pipeline
+    ppt = win32com.client.Dispatch("PowerPoint.Application")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\__init__.py", line 116, in Dispatch
+    dispatch, userName = dynamic._GetGoodDispatchAndUserName(dispatch, userName, clsctx)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\dynamic.py", line 101, in _GetGoodDispatchAndUserName
+    return (_GetGoodDispatch(IDispatch, clsctx), userName)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\dynamic.py", line 83, in _GetGoodDispatch
+    IDispatch = pythoncom.CoCreateInstance(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pywintypes.com_error: (-2147221008, 'CoInitialize has not been called.', None, None)
+2026-01-25 00:37:08,448 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 00:37:08,476 | INFO | [36db218f-f6c1-41ca-82e5-f0eedc3ca72e] Step 1: Exporting animated video
+2026-01-25 00:37:08,476 | INFO | [36db218f-f6c1-41ca-82e5-f0eedc3ca72e] Background conversion started for: my_presentation.pptx
+2026-01-25 00:37:08,486 | INFO | [36db218f-f6c1-41ca-82e5-f0eedc3ca72e] Step 2: Generating animated video via PowerPoint
+2026-01-25 00:37:08,495 | INFO | [36db218f-f6c1-41ca-82e5-f0eedc3ca72e] Step 3: Generating Azure TTS from notes
+2026-01-25 00:37:08,503 | INFO | [36db218f-f6c1-41ca-82e5-f0eedc3ca72e] Step 4: FFmpeg muxing
+2026-01-25 00:37:52,384 | ERROR | [36db218f-f6c1-41ca-82e5-f0eedc3ca72e] Conversion failed
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\dynamic.py", line 81, in _GetGoodDispatch
+    IDispatch = pythoncom.connect(IDispatch)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pywintypes.com_error: (-2147221008, 'CoInitialize has not been called.', None, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\app.py", line 121, in run_conversion_async
+    logger.info("[%s] Step 4: FFmpeg muxing", job_id)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\ppt_pipeline.py", line 108, in run_pipeline
+    ppt = win32com.client.Dispatch("PowerPoint.Application")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\__init__.py", line 116, in Dispatch
+    dispatch, userName = dynamic._GetGoodDispatchAndUserName(dispatch, userName, clsctx)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\dynamic.py", line 101, in _GetGoodDispatchAndUserName
+    return (_GetGoodDispatch(IDispatch, clsctx), userName)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\dynamic.py", line 83, in _GetGoodDispatch
+    IDispatch = pythoncom.CoCreateInstance(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pywintypes.com_error: (-2147221008, 'CoInitialize has not been called.', None, None)
+2026-01-25 00:41:17,889 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 00:41:17,926 | INFO | [1f956bca-8ba2-49b7-8abf-4b2f5ded066e] Background conversion started for: my_presentation.pptx
+2026-01-25 00:41:17,927 | INFO | [1f956bca-8ba2-49b7-8abf-4b2f5ded066e] Step 1: Exporting animated video
+2026-01-25 00:41:17,936 | INFO | [1f956bca-8ba2-49b7-8abf-4b2f5ded066e] Step 2: Generating animated video via PowerPoint
+2026-01-25 00:41:17,948 | INFO | [1f956bca-8ba2-49b7-8abf-4b2f5ded066e] Step 3: Generating Azure TTS from notes
+2026-01-25 00:41:17,955 | INFO | [1f956bca-8ba2-49b7-8abf-4b2f5ded066e] Step 4: FFmpeg muxing
+2026-01-25 00:41:18,541 | ERROR | [1f956bca-8ba2-49b7-8abf-4b2f5ded066e] Conversion failed
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\app.py", line 125, in run_conversion_async
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\ppt_pipeline.py", line 67, in run_pipeline
+    azure_key = os.environ["AZURE_TTS_KEY"]
+                ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 679, in __getitem__
+KeyError: 'AZURE_TTS_KEY'
+2026-01-25 00:45:03,753 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 00:45:03,980 | INFO | [dec4b1a3-3097-4170-a404-d8dc26d368d4] Background conversion started for: my_presentation.pptx
+2026-01-25 00:45:03,980 | INFO | [dec4b1a3-3097-4170-a404-d8dc26d368d4] Step 1: Exporting animated video
+2026-01-25 00:45:04,071 | INFO | [dec4b1a3-3097-4170-a404-d8dc26d368d4] Step 2: Generating animated video via PowerPoint
+2026-01-25 00:45:04,114 | INFO | [dec4b1a3-3097-4170-a404-d8dc26d368d4] Step 3: Generating Azure TTS from notes
+2026-01-25 00:45:04,146 | INFO | [dec4b1a3-3097-4170-a404-d8dc26d368d4] Step 4: FFmpeg muxing
+2026-01-25 00:46:11,556 | ERROR | [dec4b1a3-3097-4170-a404-d8dc26d368d4] Conversion failed
+Traceback (most recent call last):
+  File "C:\ppt-video-phase1-API\app.py", line 125, in run_conversion_async
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\ppt-video-phase1-API\ppt_pipeline.py", line 147, in run_pipeline
+    presentation.Close()
+  File "<COMObject Open>", line 2, in Close
+pywintypes.com_error: (-2147352567, 'Exception occurred.', (0, 'Microsoft PowerPoint', 'Presentation.Close : Failed.', '', 0, -2147467259), None)
+2026-01-25 00:48:18,764 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 00:48:18,797 | INFO | [bf745ecf-8a8e-41ac-a232-b88ce2f6e695] Background conversion started for: my_presentation.pptx
+2026-01-25 00:48:18,797 | INFO | [bf745ecf-8a8e-41ac-a232-b88ce2f6e695] Step 1: Exporting animated video
+2026-01-25 00:48:18,807 | INFO | [bf745ecf-8a8e-41ac-a232-b88ce2f6e695] Step 2: Generating animated video via PowerPoint
+2026-01-25 00:48:18,814 | INFO | [bf745ecf-8a8e-41ac-a232-b88ce2f6e695] Step 3: Generating Azure TTS from notes
+2026-01-25 00:48:18,819 | INFO | [bf745ecf-8a8e-41ac-a232-b88ce2f6e695] Step 4: FFmpeg muxing
+2026-01-25 00:50:21,442 | INFO | [bf745ecf-8a8e-41ac-a232-b88ce2f6e695] Conversion completed successfully
+2026-01-25 01:05:09,596 | INFO | Received PPT upload: my_presentation.pptx
+2026-01-25 01:05:09,631 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Background conversion started for: my_presentation.pptx
+2026-01-25 01:05:09,631 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Step 1: Exporting animated video
+2026-01-25 01:05:09,642 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Step 2: Generating animated video via PowerPoint
+2026-01-25 01:05:09,647 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Step 3: Generating Azure TTS from notes
+2026-01-25 01:05:09,654 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Step 4: FFmpeg muxing
+2026-01-25 01:08:10,621 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Conversion completed successfully

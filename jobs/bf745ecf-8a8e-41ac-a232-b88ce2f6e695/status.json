@@ -1,0 +1,9 @@
+{
+  "status": "completed",
+  "stage": "upload",
+  "progress": 100,
+  "message": "Video ready for download",
+  "output": "C:\\ppt-video-phase1-API\\jobs\\bf745ecf-8a8e-41ac-a232-b88ce2f6e695\\final.mp4",
+  "log": "C:\\ppt-video-phase1-API\\jobs\\bf745ecf-8a8e-41ac-a232-b88ce2f6e695\\status.log",
+  "final_video_path": "C:\\ppt-video-phase1-API\\jobs\\bf745ecf-8a8e-41ac-a232-b88ce2f6e695\\final.mp4"
+}

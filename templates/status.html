@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Status</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Job Status</h1>
+    <p class="subtitle">Job ID: <span class="mono">{{ job_id }}</span></p>
+
+    <div class="card">
+      <div class="progress">
+        <div id="progress-bar" class="progress-bar" style="width: 5%"></div>
+      </div>
+      <div class="row">
+        <span id="progress-text">Starting…</span>
+        <span id="progress-percent">5%</span>
+      </div>
+      <div id="download" class="download hidden">
+        <a class="btn" href="/download/{{ job_id }}">Download MP4</a>
+      </div>
+      <div id="error" class="error hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    const jobId = "{{ job_id }}";
+
+    async function pollStatus() {
+      try {
+        const res = await fetch(`/status/${jobId}`);
+        if (!res.ok) throw new Error("Status not available");
+        const data = await res.json();
+
+        const progress = Math.max(0, Math.min(100, data.progress || 0));
+        document.getElementById("progress-bar").style.width = `${progress}%`;
+        document.getElementById("progress-text").textContent = data.message || data.status;
+        document.getElementById("progress-percent").textContent = `${progress}%`;
+
+        if (data.status === "completed") {
+          document.getElementById("download").classList.remove("hidden");
+        }
+
+        if (data.status === "failed") {
+          document.getElementById("error").textContent = "Conversion failed. Check logs.";
+          document.getElementById("error").classList.remove("hidden");
+        }
+
+        if (data.status === "completed" || data.status === "failed") {
+          return;
+        }
+      } catch (err) {
+        document.getElementById("error").textContent = "Unable to fetch status.";
+        document.getElementById("error").classList.remove("hidden");
+      }
+
+      setTimeout(pollStatus, 3000);
+    }
+
+    pollStatus();
+  </script>
+</body>
+</html>

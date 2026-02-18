@@ -1,0 +1,8 @@
+{
+  "status": "error",
+  "stage": "upload",
+  "progress": 100,
+  "message": "Conversion failed: (-2147221008, 'CoInitialize has not been called.', None, None)",
+  "output": null,
+  "log": "C:\\ppt-video-phase1-API\\jobs\\36db218f-f6c1-41ca-82e5-f0eedc3ca72e\\status.log"
+}
