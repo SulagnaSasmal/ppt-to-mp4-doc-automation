@@ -1,62 +1,91 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Conversion History</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=20260221" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PPT2Video — Job History</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css?v=20260220b" />
 </head>
+
 <body>
-  <div class="container history-container">
-    <div class="top-actions">
-      <a class="secondary history-link" href="/">Back to Upload</a>
-    </div>
 
-    <h1 class="title">Recent Jobs</h1>
-    <p class="subtitle">Queue/history with quick actions and telemetry summary.</p>
-
-    <div class="history-table-wrap">
-      <table class="history-table">
-        <thead>
-          <tr>
-            <th>Job</th>
-            <th>Status</th>
-            <th>File</th>
-            <th>Updated</th>
-            <th>Telemetry</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if jobs %}
-            {% for job in jobs %}
-            <tr>
-              <td class="mono">{{ job.job_id }}</td>
-              <td>{{ job.status }}</td>
-              <td>{{ job.filename or '-' }}</td>
-              <td>{{ job.updated_at or '-' }}</td>
-              <td>
-                {% if job.telemetry and job.telemetry.total_seconds %}
-                  Total: {{ job.telemetry.total_seconds }}s
-                {% else %}
-                  -
-                {% endif %}
-              </td>
-              <td class="actions">
-                <a href="/status/{{ job.job_id }}">Status</a>
-                <a href="/logs/{{ job.job_id }}?download=true">Logs</a>
-                {% if job.status == 'completed' %}
-                  <a href="/download/{{ job.job_id }}">Download MP4</a>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="6">No jobs yet.</td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
+<!-- ── Top Navigation Bar ── -->
+<nav class="top-nav">
+  <div style="display:flex;align-items:center;">
+    <div class="logo">
+      <span class="logo-icon">▶</span>
+      PPT2Video
     </div>
+    <span class="project-name">AI Presentation Converter</span>
   </div>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/history" class="active">Job History</a>
+  </div>
+</nav>
+
+<!-- ── Main Content ── -->
+<main class="main-content">
+<div class="card history-card">
+
+  <div class="card-header">
+    <h1 class="card-title">Job History</h1>
+    <p class="card-subtitle">Recent conversion jobs with status, telemetry, and quick actions.</p>
+  </div>
+
+  <div class="history-table-wrap">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Status</th>
+          <th>File</th>
+          <th>Updated</th>
+          <th>Telemetry</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if jobs %}
+          {% for job in jobs %}
+          <tr>
+            <td class="mono">{{ job.job_id[:12] }}…</td>
+            <td>
+              {% set s = job.status | lower %}
+              <span class="status-badge {{ s }}">{{ job.status }}</span>
+            </td>
+            <td>{{ job.filename or '–' }}</td>
+            <td>{{ job.updated_at or '–' }}</td>
+            <td>
+              {% if job.telemetry and job.telemetry.total_seconds %}
+                {{ job.telemetry.total_seconds }}s
+              {% else %}
+                –
+              {% endif %}
+            </td>
+            <td class="actions">
+              <a href="/status/{{ job.job_id }}">Status</a>
+              <a href="/logs/{{ job.job_id }}?download=true">Logs</a>
+              {% if job.status == 'completed' %}
+                <a href="/download/{{ job.job_id }}">Download</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="6" style="text-align:center;color:var(--text-dim);padding:32px;">No jobs yet. Go to the <a href="/">Dashboard</a> to create one.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</main>
+
 </body>
 </html>

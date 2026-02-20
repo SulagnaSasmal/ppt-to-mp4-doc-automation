@@ -1,0 +1,20 @@
+{
+  "job_id": "7c009281-8206-448a-922c-053012c36376",
+  "status": "error",
+  "stage": "ppt_export",
+  "progress": 100,
+  "message": "Conversion failed: (-2147418111, 'Call was rejected by callee.', None, None)",
+  "output": null,
+  "filename": "my_presentation.pptx",
+  "settings": {
+    "voice": "en-US-JennyNeural",
+    "speaking_rate": "0%",
+    "resolution": 1080,
+    "fps": 30,
+    "quality": 80
+  },
+  "telemetry": {},
+  "created_at": "2026-02-20T13:41:10.984273+00:00",
+  "updated_at": "2026-02-20T13:42:47.128928+00:00",
+  "log": "D:\\ppt-video-phase1-API\\jobs\\7c009281-8206-448a-922c-053012c36376\\status.log"
+}

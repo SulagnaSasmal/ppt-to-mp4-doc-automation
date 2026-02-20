@@ -1,5 +1,5 @@
 :root {
-  --bg: #0b0f1a;
+  --bg: #121212;
   --card: #151a2a;
   --text: #e6e9f2;
   --muted: #9aa3b2;
@@ -16,7 +16,7 @@
 body {
   margin: 0;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: radial-gradient(1200px circle at 20% 0%, #1c2340 0%, #0b0f1a 40%, #070a12 100%);
+  background: radial-gradient(1200px circle at 20% 0%, #3a3a3a 0%, #1f1f1f 45%, #0f0f10 100%);
   color: var(--text);
 }
 

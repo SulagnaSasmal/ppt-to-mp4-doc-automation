@@ -1,359 +1,510 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>PPT → Animated Video</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=20260221" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PPT2Video — AI-Powered Presentation to Video</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css?v=20260220b" />
 </head>
 
 <body>
-<div class="container">
-  <div class="top-actions">
-    <a class="secondary history-link" href="/history">View Job History</a>
+
+<!-- ── Top Navigation Bar ── -->
+<nav class="top-nav">
+  <div style="display:flex;align-items:center;">
+    <div class="logo">
+      <span class="logo-icon">▶</span>
+      PPT2Video
+    </div>
+    <span class="project-name">AI Presentation Converter</span>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="active">Dashboard</a>
+    <a href="/history">Job History</a>
+  </div>
+</nav>
+
+<!-- ── Main Content ── -->
+<main class="main-content">
+<div class="card">
+
+  <!-- Card Header -->
+  <div class="card-header">
+    <h1 class="card-title">Generate Video from Presentation</h1>
+    <p class="card-subtitle">Upload a PPTX file. We'll use slide animations and AI voice-over from your speaker notes to generate a polished MP4.</p>
   </div>
 
-  <h1 class="title">PPT → Animated Video with AI Voice</h1>
-
-  <p class="subtitle">
-    Convert PowerPoint presentations into animated MP4 videos using slide animations
-    and AI-generated voice-over narration from speaker notes.
-  </p>
-
   <form id="uploadForm" enctype="multipart/form-data">
-    <div class="upload-box" id="upload-drop-zone">
-      <div class="upload-controls">
-        <input id="ppt-file-input" type="file" name="ppt" accept=".ppt,.pptx" required />
+
+    <!-- ── Upload Zone ── -->
+    <div class="upload-zone" id="upload-drop-zone">
+      <div class="cloud-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 16V8m0 0l-3 3m3-3l3 3"/><path d="M20 16.7A4.5 4.5 0 0 0 17.5 8h-1.09A7 7 0 1 0 4 14.34"/></svg>
       </div>
-      <p id="upload-hint">Drag & drop your PowerPoint here, or choose a file (.pptx)</p>
+      <div class="upload-text">Drop your presentation file here or <strong>browse</strong></div>
+      <div class="upload-hint">PPTX only &middot; max 50 MB</div>
+      <input id="ppt-file-input" type="file" name="ppt" accept=".ppt,.pptx" required />
+      <div id="selected-file" class="selected-file hidden"></div>
     </div>
 
-    <div class="config-grid">
-      <label class="field">
-        <span>Voice</span>
-        <input id="voice" type="text" value="{{ default_settings.voice }}" />
-      </label>
-      <label class="field">
-        <span>Speaking Rate</span>
-        <input id="speaking-rate" type="text" value="{{ default_settings.speaking_rate }}" placeholder="e.g. 0%, -10%, 15%" />
-      </label>
-      <label class="field">
-        <span>Resolution</span>
-        <input id="resolution" type="number" value="{{ default_settings.resolution }}" min="240" max="2160" />
-      </label>
-      <label class="field">
-        <span>FPS</span>
-        <input id="fps" type="number" value="{{ default_settings.fps }}" min="1" max="60" />
-      </label>
-      <label class="field">
-        <span>Quality (1-100)</span>
-        <input id="quality" type="number" value="{{ default_settings.quality }}" min="1" max="100" />
-      </label>
+    <!-- ── Control Grid ── -->
+    <div class="control-grid">
+      <!-- Left Column -->
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          Voice Selection
+        </label>
+        <input id="voice" type="text" value="{{ default_settings.voice }}" placeholder="e.g. en-US-JennyNeural" />
+      </div>
+
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Speaking Rate
+        </label>
+        <div class="range-row">
+          <input id="speaking-rate-range" type="range" min="-50" max="50" value="0" />
+          <span id="rate-value" class="range-value">0%</span>
+        </div>
+        <input id="speaking-rate" type="hidden" value="{{ default_settings.speaking_rate }}" />
+      </div>
+
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Resolution
+        </label>
+        <select id="resolution">
+          <option value="720"  {{ 'selected' if default_settings.resolution == 720  }}>720p (HD)</option>
+          <option value="1080" {{ 'selected' if default_settings.resolution == 1080 }}>1080p (Full HD)</option>
+          <option value="1440" {{ 'selected' if default_settings.resolution == 1440 }}>1440p (2K)</option>
+          <option value="2160" {{ 'selected' if default_settings.resolution == 2160 }}>2160p (4K)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          Frame Rate
+        </label>
+        <select id="fps">
+          <option value="24"  {{ 'selected' if default_settings.fps == 24  }}>24 FPS (Film)</option>
+          <option value="30"  {{ 'selected' if default_settings.fps == 30  }}>30 FPS</option>
+          <option value="60"  {{ 'selected' if default_settings.fps == 60  }}>60 FPS (Smooth)</option>
+        </select>
+      </div>
     </div>
 
+    <!-- ── Action Row ── -->
     <div class="action-row">
-      <button id="preview-btn" type="button" class="secondary">Preview Notes</button>
-      <button id="convert-btn" type="submit">Convert to Video</button>
+      <button id="reset-btn" type="button" class="btn btn-ghost" onclick="resetTask()">
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Reset
+      </button>
+      <button id="preview-btn" type="button" class="btn btn-secondary">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview Notes
+      </button>
+      <button id="convert-btn" type="submit" class="btn btn-primary">
+        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Generate Video
+      </button>
     </div>
   </form>
 
-  <div id="preview-panel" class="preview-panel hidden" style="margin-top:20px;">
-    <div class="preview-title">Preview Before Convert</div>
-    <div id="preview-meta" class="preview-meta"></div>
-    <div id="preview-notes" class="preview-notes"></div>
-  </div>
-
-  <div id="status-section" style="margin-top:20px;">
-    <div id="status-text">Waiting for upload…</div>
-
-    <div class="progress-outer">
-      <div class="progress-inner" id="progress-bar"></div>
+  <!-- ── Preview Panel (collapsible) ── -->
+  <details id="preview-panel" class="preview-panel hidden">
+    <summary>
+      <svg class="chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      Preview Before Convert
+    </summary>
+    <div class="preview-body">
+      <div id="preview-meta" class="preview-meta"></div>
+      <div id="preview-notes" class="preview-notes"></div>
     </div>
-    <div id="telemetry-summary" class="telemetry-summary"></div>
+  </details>
+
+  <!-- ── Progress Stepper ── -->
+  <div id="stepper-section" class="hidden">
+    <div class="progress-stepper">
+      <div class="step" id="step-upload">
+        <span class="step-dot">1</span>
+        <span>Upload</span>
+      </div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step" id="step-process">
+        <span class="step-dot">2</span>
+        <span>Processing</span>
+      </div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step" id="step-render">
+        <span class="step-dot">3</span>
+        <span>Rendering</span>
+      </div>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+
+    <div id="status-text" class="status-text">Waiting for upload…</div>
+
+    <div id="telemetry-bar" class="telemetry-bar"></div>
   </div>
 
-  <div id="download-section" style="margin-top:20px;">
-    <button id="download-video" disabled>⬇ Download Video (MP4)</button>
-    <button id="download-log" disabled>📄 Download Log</button>
+  <!-- ── Success Toast ── -->
+  <div id="success-toast" class="success-toast">
+    <div class="toast-icon">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="toast-body">
+      <div class="toast-title">Video Ready!</div>
+      <div class="toast-sub" id="toast-telemetry"></div>
+    </div>
+    <div class="toast-actions">
+      <button id="download-video" class="btn btn-success" disabled>
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download MP4
+      </button>
+      <button id="download-log" class="btn btn-icon" title="Download Log" disabled>
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </button>
+    </div>
   </div>
 
-  <div id="logs-section" style="margin-top:20px;">
-    <div class="logs-title">Live Logs</div>
-    <pre id="live-logs" class="live-logs">No logs yet.</pre>
+  <!-- ── Error Toast ── -->
+  <div id="error-toast" class="error-toast">
+    <div class="toast-icon">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    </div>
+    <div class="toast-body">
+      <div class="toast-title">Conversion Failed</div>
+      <div class="toast-sub" id="error-detail">Check the logs for details.</div>
+    </div>
   </div>
 
-  <div style="margin-top:16px;">
-    <button id="reset-btn" class="secondary" onclick="resetTask()">Reset</button>
-  </div>
+  <!-- ── Collapsible Live Logs ── -->
+  <details class="logs-accordion">
+    <summary>
+      <svg class="chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      <svg class="log-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      Live Logs
+    </summary>
+    <div class="logs-body">
+      <pre id="live-logs" class="live-logs">No logs yet.</pre>
+    </div>
+  </details>
+
 </div>
+</main>
 
+<!-- ════════════════════════════════════════════════════════════
+     JavaScript
+     ════════════════════════════════════════════════════════════ -->
 <script>
-let jobId = null;
+/* --- State --- */
+let jobId       = null;
 let pollInterval = null;
-let logInterval = null;
+let logInterval  = null;
 
-const uploadForm = document.getElementById("uploadForm");
-const fileInput = document.getElementById("ppt-file-input");
-const uploadDropZone = document.getElementById("upload-drop-zone");
-const uploadHint = document.getElementById("upload-hint");
-const liveLogs = document.getElementById("live-logs");
-const previewBtn = document.getElementById("preview-btn");
-const previewPanel = document.getElementById("preview-panel");
-const previewMeta = document.getElementById("preview-meta");
-const previewNotes = document.getElementById("preview-notes");
+/* --- DOM refs --- */
+const uploadForm      = document.getElementById("uploadForm");
+const fileInput       = document.getElementById("ppt-file-input");
+const uploadDropZone  = document.getElementById("upload-drop-zone");
+const selectedFileEl  = document.getElementById("selected-file");
+const liveLogs        = document.getElementById("live-logs");
+const previewBtn      = document.getElementById("preview-btn");
+const previewPanel    = document.getElementById("preview-panel");
+const previewMeta     = document.getElementById("preview-meta");
+const previewNotes    = document.getElementById("preview-notes");
+const stepperSection  = document.getElementById("stepper-section");
+const successToast    = document.getElementById("success-toast");
+const errorToast      = document.getElementById("error-toast");
+const rateRange       = document.getElementById("speaking-rate-range");
+const rateValue       = document.getElementById("rate-value");
+const rateHidden      = document.getElementById("speaking-rate");
 
+/* --- Range slider sync --- */
+function syncRate() {
+  const v = rateRange.value;
+  const prefix = v > 0 ? "+" : "";
+  rateValue.textContent = prefix + v + "%";
+  rateHidden.value = prefix + v + "%";
+}
+rateRange.addEventListener("input", syncRate);
+// Init from server default
+(function initRange() {
+  const raw = rateHidden.value.replace("%","").replace("+","");
+  const num = parseInt(raw, 10) || 0;
+  rateRange.value = num;
+  syncRate();
+})();
+
+/* --- Helpers --- */
 function readSettings() {
   return {
-    voice: document.getElementById("voice").value,
-    speaking_rate: document.getElementById("speaking-rate").value,
-    resolution: document.getElementById("resolution").value,
-    fps: document.getElementById("fps").value,
-    quality: document.getElementById("quality").value
+    voice:        document.getElementById("voice").value,
+    speaking_rate: rateHidden.value,
+    resolution:    document.getElementById("resolution").value,
+    fps:           document.getElementById("fps").value,
+    quality:       80
   };
 }
 
 function buildFormData() {
-  const formData = new FormData();
-  if (fileInput.files[0]) {
-    formData.append("ppt", fileInput.files[0]);
-  }
-  const settings = readSettings();
-  Object.keys(settings).forEach((key) => formData.append(key, settings[key]));
-  return formData;
+  const fd = new FormData();
+  if (fileInput.files[0]) fd.append("ppt", fileInput.files[0]);
+  const s = readSettings();
+  Object.keys(s).forEach(k => fd.append(k, s[k]));
+  return fd;
 }
 
 function showSelectedFile(file) {
-  if (!uploadHint) return;
   if (!file) {
-    uploadHint.innerText = "Drag & drop your PowerPoint here, or choose a file (.pptx)";
+    selectedFileEl.classList.add("hidden");
+    selectedFileEl.textContent = "";
     return;
   }
-  uploadHint.innerText = `Selected: ${file.name}`;
+  const sizeMB = (file.size / 1048576).toFixed(1);
+  selectedFileEl.textContent = `✓ ${file.name} (${sizeMB} MB)`;
+  selectedFileEl.classList.remove("hidden");
 }
 
-function setDropActive(active) {
-  if (!uploadDropZone) return;
-  uploadDropZone.classList.toggle("drag-active", active);
-}
+/* --- Drag & Drop --- */
+["dragenter","dragover"].forEach(e =>
+  uploadDropZone.addEventListener(e, ev => { ev.preventDefault(); uploadDropZone.classList.add("drag-active"); })
+);
+["dragleave","drop"].forEach(e =>
+  uploadDropZone.addEventListener(e, ev => { ev.preventDefault(); uploadDropZone.classList.remove("drag-active"); })
+);
+uploadDropZone.addEventListener("drop", ev => {
+  const files = ev.dataTransfer?.files;
+  if (!files || !files.length) return;
+  fileInput.files = files;
+  showSelectedFile(files[0]);
+});
+fileInput.addEventListener("change", () => showSelectedFile(fileInput.files?.[0]));
 
+/* --- Preview --- */
 function renderPreview(data) {
   previewPanel.classList.remove("hidden");
-  previewMeta.textContent = `Slides: ${data.slides_total} | With notes: ${data.slides_with_notes} | Voice: ${data.settings.voice} | Rate: ${data.settings.speaking_rate}`;
+  previewPanel.open = true;
 
-  const items = data.notes.map((note) => {
-    const text = note.text ? note.text : "(No notes on this slide)";
-    return `<div class="note-item"><div class="note-head">Slide ${note.slide}</div><div class="note-text">${text.replaceAll("<", "&lt;")}</div></div>`;
-  }).join("");
+  previewMeta.innerHTML = [
+    `<span class="meta-chip">Slides: ${data.slides_total}</span>`,
+    `<span class="meta-chip">With notes: ${data.slides_with_notes}</span>`,
+    `<span class="meta-chip">Voice: ${data.settings.voice}</span>`,
+    `<span class="meta-chip">Rate: ${data.settings.speaking_rate}</span>`
+  ].join("");
 
-  previewNotes.innerHTML = items || "<div class='note-item'>No slides found.</div>";
-}
-
-function setTelemetry(telemetry) {
-  const box = document.getElementById("telemetry-summary");
-  if (!box) return;
-  if (!telemetry || !telemetry.total_seconds) {
-    box.textContent = "";
-    return;
-  }
-
-  box.textContent = `Timings — Export: ${telemetry.ppt_export_seconds}s | TTS: ${telemetry.tts_seconds}s | Mux: ${telemetry.mux_seconds}s | Total: ${telemetry.total_seconds}s`;
-}
-
-if (uploadDropZone) {
-  ["dragenter", "dragover"].forEach((eventName) => {
-    uploadDropZone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      setDropActive(true);
-    });
-  });
-
-  ["dragleave", "drop"].forEach((eventName) => {
-    uploadDropZone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      setDropActive(false);
-    });
-  });
-
-  uploadDropZone.addEventListener("drop", (event) => {
-    const files = event.dataTransfer?.files;
-    if (!files || files.length === 0) return;
-    fileInput.files = files;
-    showSelectedFile(files[0]);
-  });
-}
-
-if (fileInput) {
-  fileInput.addEventListener("change", () => {
-    showSelectedFile(fileInput.files?.[0]);
-  });
+  previewNotes.innerHTML = data.notes.map(n => {
+    const text = n.text ? n.text.replaceAll("<","&lt;") : "(No notes on this slide)";
+    return `<div class="note-item"><div class="note-head">Slide ${n.slide}</div><div class="note-text">${text}</div></div>`;
+  }).join("") || '<div class="note-item">No slides found.</div>';
 }
 
 previewBtn.addEventListener("click", async () => {
   const file = fileInput.files[0];
-  if (!file) {
-    alert("Please select a PPT file first");
-    return;
-  }
-
-  const formData = buildFormData();
-  const res = await fetch("/preview-notes", { method: "POST", body: formData });
+  if (!file) { alert("Please select a PPTX file first."); return; }
+  const fd = buildFormData();
+  const res = await fetch("/preview-notes", { method: "POST", body: fd });
   const data = await res.json();
-
-  if (!res.ok) {
-    alert(data.detail || "Preview failed");
-    return;
-  }
-
+  if (!res.ok) { alert(data.detail || "Preview failed"); return; }
   renderPreview(data);
-  if (!data.can_convert) {
-    alert("No slide notes found. Add notes to at least one slide before converting.");
-  }
+  if (!data.can_convert) alert("No slide notes found. Add notes to at least one slide before converting.");
 });
 
-uploadForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const file = fileInput.files[0];
-  if (!file) {
-    alert("Please select a PPT file");
-    return;
-  }
+/* --- Stepper --- */
+function setStepper(stage, pct) {
+  // stage: 0=idle, 1=upload, 2=processing, 3=rendering, 4=done
+  const ids    = ["step-upload","step-process","step-render"];
+  const lines  = ["line-1","line-2"];
 
-  const formData = buildFormData();
-  const res = await fetch("/convert-ui", {
-    method: "POST",
-    body: formData
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove("active","done");
+    if (i + 1 < stage) el.classList.add("done");
+    else if (i + 1 === stage) el.classList.add("active");
   });
 
+  lines.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove("active","done");
+    if (i + 1 < stage) el.classList.add("done");
+    else if (i + 1 === stage) el.classList.add("active");
+  });
+
+  document.getElementById("progress-bar").style.width = pct + "%";
+}
+
+/* --- Telemetry --- */
+function setTelemetry(t) {
+  const bar = document.getElementById("telemetry-bar");
+  if (!bar) return;
+  if (!t || !t.total_seconds) { bar.innerHTML = ""; return; }
+  bar.innerHTML = [
+    `<span class="t-item"><span class="t-label">Export:</span><span class="t-value">${t.ppt_export_seconds}s</span></span>`,
+    `<span class="t-item"><span class="t-label">TTS:</span><span class="t-value">${t.tts_seconds}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Mux:</span><span class="t-value">${t.mux_seconds}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Total:</span><span class="t-value">${t.total_seconds}s</span></span>`
+  ].join("");
+
+  const toastSub = document.getElementById("toast-telemetry");
+  if (toastSub) toastSub.textContent = `Total: ${t.total_seconds}s — Export ${t.ppt_export_seconds}s · TTS ${t.tts_seconds}s · Mux ${t.mux_seconds}s`;
+}
+
+/* --- Submit / Convert --- */
+uploadForm.addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) { alert("Please select a PPTX file."); return; }
+
+  // Show stepper, hide toasts
+  stepperSection.classList.remove("hidden");
+  successToast.classList.remove("visible");
+  errorToast.classList.remove("visible");
+  setStepper(1, 5);
+  document.getElementById("status-text").textContent = "Uploading…";
+
+  const fd = buildFormData();
+  const res = await fetch("/convert-ui", { method: "POST", body: fd });
   const data = await res.json();
-  if (!res.ok) {
-    alert(data.detail || "Could not start conversion");
-    return;
-  }
+  if (!res.ok) { alert(data.detail || "Could not start conversion"); return; }
 
   jobId = data.job_id;
-  if (liveLogs) liveLogs.textContent = "Job started...\n";
+  if (liveLogs) liveLogs.textContent = "Job started…\n";
+
+  setStepper(2, 15);
+  document.getElementById("status-text").textContent = "Processing…";
 
   startPolling(jobId);
   startLogPolling(jobId);
 });
 
-function stopLogPolling() {
-  if (logInterval) {
-    clearInterval(logInterval);
-    logInterval = null;
-  }
-}
-
-async function refreshLogs(currentJobId) {
-  if (!currentJobId || !liveLogs) return;
-  try {
-    const res = await fetch(`/logs/${currentJobId}`);
-    if (!res.ok) return;
-    const logText = await res.text();
-    liveLogs.textContent = logText?.trim() ? logText : "No logs yet.";
-    liveLogs.scrollTop = liveLogs.scrollHeight;
-  } catch (error) {
-  }
-}
-
-function startLogPolling(currentJobId) {
-  stopLogPolling();
-  refreshLogs(currentJobId);
-  logInterval = setInterval(() => refreshLogs(currentJobId), 1500);
-}
-
-function updateStatus(data) {
-  const label = document.getElementById("status-text");
-  if (label) label.innerText = `Status: ${data.status} | ${data.message || ""}`;
-  const bar = document.getElementById("progress-bar");
-  if (bar) bar.style.width = `${data.progress || 0}%`;
-  setTelemetry(data.telemetry);
-}
-
-function startPolling(currentJobId) {
+/* --- Polling --- */
+function startPolling(jid) {
   pollInterval = setInterval(async () => {
-    const res = await fetch(`/status/${currentJobId}`);
-    const data = await res.json();
+    const res = await fetch(`/status/${jid}`);
+    const d   = await res.json();
+    updateStatus(d);
 
-    updateStatus(data);
-
-    if (data.status === "READY" || data.status === "completed") {
+    if (d.status === "READY" || d.status === "completed") {
       clearInterval(pollInterval);
-      enableDownload(data.download_url || `/download/${currentJobId}`);
-      refreshLogs(currentJobId);
-      stopLogPolling();
+      onSuccess(d);
     }
-
-    if (data.status === "FAILED" || data.status === "error") {
+    if (d.status === "FAILED" || d.status === "error") {
       clearInterval(pollInterval);
-      const label = document.getElementById("status-text");
-      if (label) label.innerText = "Status: Failed (see logs)";
-      refreshLogs(currentJobId);
-      stopLogPolling();
-
-      const dlLog = document.getElementById("download-log");
-      if (dlLog && currentJobId) {
-        dlLog.disabled = false;
-        dlLog.onclick = () => window.location.href = `/logs/${currentJobId}?download=true`;
-      }
+      onError(d);
     }
   }, 1500);
 }
 
-function enableDownload(videoUrl) {
-  const dl = document.getElementById("download-video");
-  if (dl) {
-    dl.disabled = false;
-    dl.onclick = () => window.location.href = videoUrl;
+function updateStatus(d) {
+  const lbl = document.getElementById("status-text");
+  const pct = d.progress || 0;
+
+  if (pct < 40) {
+    setStepper(2, pct);
+    if (lbl) lbl.textContent = `Processing… ${pct}%`;
+  } else {
+    setStepper(3, pct);
+    if (lbl) lbl.textContent = `Rendering… ${pct}%`;
   }
 
-  const dlLog = document.getElementById("download-log");
-  if (dlLog && jobId) {
-    dlLog.disabled = false;
-    dlLog.onclick = () => window.location.href = `/logs/${jobId}?download=true`;
-  }
-
-  const label = document.getElementById("status-text");
-  if (label) label.innerText = "Status: Ready ✅";
+  setTelemetry(d.telemetry);
 }
 
-function resetTask() {
-  if (pollInterval) {
-    clearInterval(pollInterval);
-    pollInterval = null;
-  }
-  stopLogPolling();
+function onSuccess(d) {
+  setStepper(4, 100);
+  document.getElementById("status-text").textContent = "Complete ✓";
+  setTelemetry(d.telemetry);
 
+  // Show success toast
+  successToast.classList.add("visible");
+  errorToast.classList.remove("visible");
+
+  const dlBtn = document.getElementById("download-video");
+  dlBtn.disabled = false;
+  dlBtn.onclick = () => window.location.href = d.download_url || `/download/${jobId}`;
+
+  const logBtn = document.getElementById("download-log");
+  logBtn.disabled = false;
+  logBtn.onclick = () => window.location.href = `/logs/${jobId}?download=true`;
+
+  refreshLogs(jobId);
+  stopLogPolling();
+}
+
+function onError(d) {
+  setStepper(0, 0);
+  document.getElementById("status-text").textContent = "Failed";
+  errorToast.classList.add("visible");
+  successToast.classList.remove("visible");
+
+  const logBtn = document.getElementById("download-log");
+  if (logBtn && jobId) {
+    logBtn.disabled = false;
+    logBtn.onclick = () => window.location.href = `/logs/${jobId}?download=true`;
+  }
+
+  refreshLogs(jobId);
+  stopLogPolling();
+}
+
+/* --- Log polling --- */
+function stopLogPolling() {
+  if (logInterval) { clearInterval(logInterval); logInterval = null; }
+}
+
+async function refreshLogs(jid) {
+  if (!jid || !liveLogs) return;
+  try {
+    const res = await fetch(`/logs/${jid}`);
+    if (!res.ok) return;
+    const txt = await res.text();
+    liveLogs.textContent = txt?.trim() ? txt : "No logs yet.";
+    liveLogs.scrollTop = liveLogs.scrollHeight;
+  } catch (_) {}
+}
+
+function startLogPolling(jid) {
+  stopLogPolling();
+  refreshLogs(jid);
+  logInterval = setInterval(() => refreshLogs(jid), 1500);
+}
+
+/* --- Reset --- */
+function resetTask() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  stopLogPolling();
   jobId = null;
 
-  const label = document.getElementById("status-text");
-  if (label) label.innerText = "Waiting for upload…";
+  stepperSection.classList.add("hidden");
+  successToast.classList.remove("visible");
+  errorToast.classList.remove("visible");
 
-  const bar = document.getElementById("progress-bar");
-  if (bar) bar.style.width = "0%";
-
+  setStepper(0, 0);
+  document.getElementById("status-text").textContent = "Waiting for upload…";
   setTelemetry(null);
 
   const dl = document.getElementById("download-video");
-  if (dl) {
-    dl.disabled = true;
-    dl.onclick = null;
-  }
-
+  if (dl) { dl.disabled = true; dl.onclick = null; }
   const dlLog = document.getElementById("download-log");
-  if (dlLog) {
-    dlLog.disabled = true;
-    dlLog.onclick = null;
-  }
+  if (dlLog) { dlLog.disabled = true; dlLog.onclick = null; }
 
-  if (liveLogs) {
-    liveLogs.textContent = "No logs yet.";
-  }
-
+  if (liveLogs) liveLogs.textContent = "No logs yet.";
   previewPanel.classList.add("hidden");
-  previewMeta.textContent = "";
+  previewPanel.open = false;
+  previewMeta.innerHTML = "";
   previewNotes.innerHTML = "";
 
-  document.getElementById("uploadForm").reset();
+  uploadForm.reset();
   showSelectedFile(null);
+  syncRate();
 }
 </script>
 

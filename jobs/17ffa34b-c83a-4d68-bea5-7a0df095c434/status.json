@@ -1,0 +1,26 @@
+{
+  "job_id": "17ffa34b-c83a-4d68-bea5-7a0df095c434",
+  "status": "completed",
+  "stage": "mux",
+  "progress": 100,
+  "message": "Video ready for download",
+  "output": "D:\\ppt-video-phase1-API\\jobs\\17ffa34b-c83a-4d68-bea5-7a0df095c434\\final.mp4",
+  "filename": "my_presentation.pptx",
+  "settings": {
+    "voice": "en-US-JennyNeural",
+    "speaking_rate": "0%",
+    "resolution": 1080,
+    "fps": 30,
+    "quality": 80
+  },
+  "telemetry": {
+    "tts_seconds": 35.1,
+    "ppt_export_seconds": 98.05,
+    "mux_seconds": 7.19,
+    "total_seconds": 141.1
+  },
+  "created_at": "2026-02-20T13:44:13.153019+00:00",
+  "updated_at": "2026-02-20T13:46:36.708107+00:00",
+  "log": "D:\\ppt-video-phase1-API\\jobs\\17ffa34b-c83a-4d68-bea5-7a0df095c434\\status.log",
+  "final_video_path": "D:\\ppt-video-phase1-API\\jobs\\17ffa34b-c83a-4d68-bea5-7a0df095c434\\final.mp4"
+}

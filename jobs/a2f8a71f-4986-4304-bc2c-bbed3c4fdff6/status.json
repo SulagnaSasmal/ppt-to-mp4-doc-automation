@@ -1,0 +1,8 @@
+{
+  "status": "error",
+  "stage": "upload",
+  "progress": 100,
+  "message": "Conversion failed: [WinError 2] The system cannot find the file specified",
+  "output": null,
+  "log": "C:\\Users\\DELL\\Downloads\\PPT-Video Project-20260218T163846Z-1-002\\PPT-Video Project\\ppt-video-phase1-API-4\\ppt-video-phase1-API\\jobs\\a2f8a71f-4986-4304-bc2c-bbed3c4fdff6\\status.log"
+}

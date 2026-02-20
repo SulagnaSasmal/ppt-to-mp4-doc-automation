@@ -190,3 +190,120 @@ pywintypes.com_error: (-2147352567, 'Exception occurred.', (0, 'Microsoft PowerP
 2026-01-25 01:05:09,647 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Step 3: Generating Azure TTS from notes
 2026-01-25 01:05:09,654 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Step 4: FFmpeg muxing
 2026-01-25 01:08:10,621 | INFO | [d5990095-6ce0-458e-8aed-ef70c3c02181] Conversion completed successfully
+2026-02-20 16:03:46,152 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 16:03:46,171 | INFO | [dcdb60a8-9c19-40e7-87db-5f1abbebf794] Background conversion started for: my_presentation.pptx
+2026-02-20 16:03:46,171 | INFO | [dcdb60a8-9c19-40e7-87db-5f1abbebf794] Step 1: Exporting animated video
+2026-02-20 16:03:46,171 | INFO | [dcdb60a8-9c19-40e7-87db-5f1abbebf794] Step 2: Generating animated video via PowerPoint
+2026-02-20 16:03:46,177 | INFO | [dcdb60a8-9c19-40e7-87db-5f1abbebf794] Step 3: Generating Azure TTS from notes
+2026-02-20 16:03:46,179 | INFO | [dcdb60a8-9c19-40e7-87db-5f1abbebf794] Step 4: FFmpeg muxing
+2026-02-20 16:03:51,283 | ERROR | [dcdb60a8-9c19-40e7-87db-5f1abbebf794] Conversion failed
+Traceback (most recent call last):
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\app.py", line 140, in run_conversion_async
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\ppt_pipeline.py", line 115, in run_pipeline
+    audio_durations[i] = probe_duration_seconds(out_mp3)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\ppt_pipeline.py", line 17, in probe_duration_seconds
+    result = subprocess.check_output([
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 466, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 1538, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] The system cannot find the file specified
+2026-02-20 16:04:39,799 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 16:04:39,829 | INFO | [129e82ab-1016-4b59-9b5d-3716c652ed46] Background conversion started for: my_presentation.pptx
+2026-02-20 16:04:39,829 | INFO | [129e82ab-1016-4b59-9b5d-3716c652ed46] Step 1: Exporting animated video
+2026-02-20 16:04:39,834 | INFO | [129e82ab-1016-4b59-9b5d-3716c652ed46] Step 2: Generating animated video via PowerPoint
+2026-02-20 16:04:39,837 | INFO | [129e82ab-1016-4b59-9b5d-3716c652ed46] Step 3: Generating Azure TTS from notes
+2026-02-20 16:04:39,838 | INFO | [129e82ab-1016-4b59-9b5d-3716c652ed46] Step 4: FFmpeg muxing
+2026-02-20 16:04:41,851 | ERROR | [129e82ab-1016-4b59-9b5d-3716c652ed46] Conversion failed
+Traceback (most recent call last):
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\app.py", line 140, in run_conversion_async
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\ppt_pipeline.py", line 115, in run_pipeline
+    audio_durations[i] = probe_duration_seconds(out_mp3)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\ppt_pipeline.py", line 17, in probe_duration_seconds
+    result = subprocess.check_output([
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 466, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 1538, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] The system cannot find the file specified
+2026-02-20 16:15:20,405 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 16:15:20,444 | INFO | [a2f8a71f-4986-4304-bc2c-bbed3c4fdff6] Background conversion started for: my_presentation.pptx
+2026-02-20 16:15:20,444 | INFO | [a2f8a71f-4986-4304-bc2c-bbed3c4fdff6] Step 1: Exporting animated video
+2026-02-20 16:15:20,452 | INFO | [a2f8a71f-4986-4304-bc2c-bbed3c4fdff6] Step 2: Generating animated video via PowerPoint
+2026-02-20 16:15:20,455 | INFO | [a2f8a71f-4986-4304-bc2c-bbed3c4fdff6] Step 3: Generating Azure TTS from notes
+2026-02-20 16:15:20,458 | INFO | [a2f8a71f-4986-4304-bc2c-bbed3c4fdff6] Step 4: FFmpeg muxing
+2026-02-20 16:15:24,056 | ERROR | [a2f8a71f-4986-4304-bc2c-bbed3c4fdff6] Conversion failed
+Traceback (most recent call last):
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\app.py", line 140, in run_conversion_async
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\ppt_pipeline.py", line 115, in run_pipeline
+    "X-Microsoft-OutputFormat": "audio-24khz-160kbitrate-mono-mp3",
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\ppt_pipeline.py", line 17, in probe_duration_seconds
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 466, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python311\Lib\subprocess.py", line 1538, in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [WinError 2] The system cannot find the file specified
+2026-02-20 16:22:00,176 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 16:22:00,212 | INFO | [ba8370ad-26f1-4302-990a-faab747f7f35] Background conversion started for: my_presentation.pptx
+2026-02-20 16:22:00,212 | INFO | [ba8370ad-26f1-4302-990a-faab747f7f35] Step 1: Exporting animated video
+2026-02-20 16:22:00,216 | INFO | [ba8370ad-26f1-4302-990a-faab747f7f35] Step 2: Generating animated video via PowerPoint
+2026-02-20 16:22:00,216 | INFO | [ba8370ad-26f1-4302-990a-faab747f7f35] Step 3: Generating Azure TTS from notes
+2026-02-20 16:22:00,223 | INFO | [ba8370ad-26f1-4302-990a-faab747f7f35] Step 4: FFmpeg muxing
+2026-02-20 16:22:45,266 | ERROR | [ba8370ad-26f1-4302-990a-faab747f7f35] Conversion failed
+Traceback (most recent call last):
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\app.py", line 140, in run_conversion_async
+    output_video = run_pipeline(ppt_path, job_dir)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\Downloads\PPT-Video Project-20260218T163846Z-1-002\PPT-Video Project\ppt-video-phase1-API-4\ppt-video-phase1-API\ppt_pipeline.py", line 179, in run_pipeline
+    presentation.Close()
+  File "<COMObject Open>", line 2, in Close
+pywintypes.com_error: (-2147352567, 'Exception occurred.', (0, 'Microsoft PowerPoint', 'Presentation.Close : Failed.', '', 0, -2147467259), None)
+2026-02-20 16:41:16,294 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 16:41:16,326 | INFO | [e2c81333-ec88-4623-b18c-de6ff431037b] Background conversion started for: my_presentation.pptx
+2026-02-20 16:41:16,326 | INFO | [e2c81333-ec88-4623-b18c-de6ff431037b] Step 1: Exporting animated video
+2026-02-20 16:41:16,332 | INFO | [e2c81333-ec88-4623-b18c-de6ff431037b] Step 2: Generating animated video via PowerPoint
+2026-02-20 16:41:16,335 | INFO | [e2c81333-ec88-4623-b18c-de6ff431037b] Step 3: Generating Azure TTS from notes
+2026-02-20 16:41:16,339 | INFO | [e2c81333-ec88-4623-b18c-de6ff431037b] Step 4: FFmpeg muxing
+2026-02-20 16:43:02,827 | INFO | [e2c81333-ec88-4623-b18c-de6ff431037b] Conversion completed successfully
+2026-02-20 17:33:07,979 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 17:33:08,031 | INFO | [bcd5beb6-3e6b-4b7b-b2b1-9d2eae3a1a5e] Background conversion started for: my_presentation.pptx
+2026-02-20 17:33:08,032 | INFO | [bcd5beb6-3e6b-4b7b-b2b1-9d2eae3a1a5e] Step 1: Exporting animated video
+2026-02-20 17:33:08,039 | INFO | [bcd5beb6-3e6b-4b7b-b2b1-9d2eae3a1a5e] Step 2: Generating animated video via PowerPoint
+2026-02-20 17:33:08,048 | INFO | [bcd5beb6-3e6b-4b7b-b2b1-9d2eae3a1a5e] Step 3: Generating Azure TTS from notes
+2026-02-20 17:33:08,060 | INFO | [bcd5beb6-3e6b-4b7b-b2b1-9d2eae3a1a5e] Step 4: FFmpeg muxing
+2026-02-20 17:34:58,867 | INFO | [bcd5beb6-3e6b-4b7b-b2b1-9d2eae3a1a5e] Conversion completed successfully
+2026-02-20 18:00:58,335 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 18:00:58,386 | INFO | [578e32dc-2d5e-4cf3-be73-8a00fd483c70] Background conversion started for: my_presentation.pptx
+2026-02-20 18:03:30,843 | INFO | [578e32dc-2d5e-4cf3-be73-8a00fd483c70] Conversion completed successfully

@@ -1,0 +1,9 @@
+{
+  "status": "completed",
+  "stage": "upload",
+  "progress": 100,
+  "message": "Video ready for download",
+  "output": "C:\\Users\\DELL\\Downloads\\PPT-Video Project-20260218T163846Z-1-002\\PPT-Video Project\\ppt-video-phase1-API-4\\ppt-video-phase1-API\\jobs\\e2c81333-ec88-4623-b18c-de6ff431037b\\final.mp4",
+  "log": "C:\\Users\\DELL\\Downloads\\PPT-Video Project-20260218T163846Z-1-002\\PPT-Video Project\\ppt-video-phase1-API-4\\ppt-video-phase1-API\\jobs\\e2c81333-ec88-4623-b18c-de6ff431037b\\status.log",
+  "final_video_path": "C:\\Users\\DELL\\Downloads\\PPT-Video Project-20260218T163846Z-1-002\\PPT-Video Project\\ppt-video-phase1-API-4\\ppt-video-phase1-API\\jobs\\e2c81333-ec88-4623-b18c-de6ff431037b\\final.mp4"
+}

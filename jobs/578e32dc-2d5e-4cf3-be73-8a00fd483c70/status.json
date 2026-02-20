@@ -1,0 +1,26 @@
+{
+  "job_id": "578e32dc-2d5e-4cf3-be73-8a00fd483c70",
+  "status": "completed",
+  "stage": "mux",
+  "progress": 100,
+  "message": "Video ready for download",
+  "output": "C:\\Users\\DELL\\Downloads\\PPT-Video Project-20260218T163846Z-1-002\\PPT-Video Project\\ppt-video-phase1-API-4\\ppt-video-phase1-API\\jobs\\578e32dc-2d5e-4cf3-be73-8a00fd483c70\\final.mp4",
+  "filename": "my_presentation.pptx",
+  "settings": {
+    "voice": "en-US-JennyNeural",
+    "speaking_rate": "0%",
+    "resolution": 1080,
+    "fps": 30,
+    "quality": 100
+  },
+  "telemetry": {
+    "tts_seconds": 40.95,
+    "ppt_export_seconds": 102.6,
+    "mux_seconds": 5.44,
+    "total_seconds": 149.78
+  },
+  "created_at": "2026-02-20T12:30:58.337760+00:00",
+  "updated_at": "2026-02-20T12:33:30.854832+00:00",
+  "log": "C:\\Users\\DELL\\Downloads\\PPT-Video Project-20260218T163846Z-1-002\\PPT-Video Project\\ppt-video-phase1-API-4\\ppt-video-phase1-API\\jobs\\578e32dc-2d5e-4cf3-be73-8a00fd483c70\\status.log",
+  "final_video_path": "C:\\Users\\DELL\\Downloads\\PPT-Video Project-20260218T163846Z-1-002\\PPT-Video Project\\ppt-video-phase1-API-4\\ppt-video-phase1-API\\jobs\\578e32dc-2d5e-4cf3-be73-8a00fd483c70\\final.mp4"
+}

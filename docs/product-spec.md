@@ -2,7 +2,7 @@ PPT-to-MP4 Utility
 Author: Sulagna
 Status: MVP in progress
 Document Type: Product / Technical Specification
-Last Updated: 22/01/2026
+Last Updated: 20/02/2026
 
 Overview
 The PPT-to-MP4 Utility is a lightweight, API-driven tool designed to convert PowerPoint presentations into MP4 video format. This utility allows for the quick creation of explainer videos, demos, and walkthroughs, especially for product presentations, documentation, and training purposes, without the need for professional video editing software.
@@ -22,9 +22,30 @@ What’s delivered so far (Phase 1)
 • Validated feasibility through a live demo to stakeholders
 
 What’s in progress (Phase 2)
-• Support for PPT animations and transitions
-• Hosted, API-based conversion service
-• Service-oriented architecture suitable for platform integration
+• Hardening and UX refinement for broader internal usage
+• Configurability and preview-first author workflow
+• Operational telemetry for performance tuning
+
+Latest Implemented Enhancements (20 Feb 2026)
+• Preview Before Convert
+  o Users can preview extracted slide notes before starting a job
+  o Prevents low-quality outputs due to missing/incorrect notes
+• Configurable Conversion Settings
+  o Voice name, speaking rate, resolution, FPS, and quality are configurable from UI
+  o Settings are persisted with each job for traceability
+• Queue / History Experience
+  o Added history page with recent jobs, status, timestamps, logs, and quick download actions
+  o Added history API for future dashboards
+• Telemetry-lite
+  o Captures stage-level timings (PowerPoint export, TTS, FFmpeg mux, total)
+  o Exposed in job status and UI summary for diagnostics and optimization
+• Packaging and Dependency Check
+  o Added one-command startup script
+  o Added preflight checks for Python, Azure env, FFmpeg/ffprobe, and PowerPoint COM
+• UI Improvements
+  o Drag-and-drop upload on the front page
+  o Live log streaming panel
+  o Collapsible preview section for cleaner page layout
 
 What this unlocks next
 • Scalable video generation across teams
@@ -126,6 +147,9 @@ POST /convert   Upload PPT and start conversion
 GET /status/{job_id}    Check job progress
 GET /download/{job_id}  Download final MP4
 GET /logs/{job_id}      Retrieve processing logs
+POST /preview-notes      Preview extracted slide notes + selected settings
+GET /history             HTML queue/history page for recent jobs
+GET /api/history         JSON history endpoint (recent jobs)
 
 Processing Model
 • PPT uploaded via API/UI

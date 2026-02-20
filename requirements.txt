@@ -5,3 +5,4 @@ requests
 python-pptx
 python-multipart
 jinja2
+python-dotenv
