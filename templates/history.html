@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Conversion History</title>
+  <link rel="stylesheet" href="/static/css/style.css?v=20260221" />
+</head>
+<body>
+  <div class="container history-container">
+    <div class="top-actions">
+      <a class="secondary history-link" href="/">Back to Upload</a>
+    </div>
+
+    <h1 class="title">Recent Jobs</h1>
+    <p class="subtitle">Queue/history with quick actions and telemetry summary.</p>
+
+    <div class="history-table-wrap">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Status</th>
+            <th>File</th>
+            <th>Updated</th>
+            <th>Telemetry</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if jobs %}
+            {% for job in jobs %}
+            <tr>
+              <td class="mono">{{ job.job_id }}</td>
+              <td>{{ job.status }}</td>
+              <td>{{ job.filename or '-' }}</td>
+              <td>{{ job.updated_at or '-' }}</td>
+              <td>
+                {% if job.telemetry and job.telemetry.total_seconds %}
+                  Total: {{ job.telemetry.total_seconds }}s
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td class="actions">
+                <a href="/status/{{ job.job_id }}">Status</a>
+                <a href="/logs/{{ job.job_id }}?download=true">Logs</a>
+                {% if job.status == 'completed' %}
+                  <a href="/download/{{ job.job_id }}">Download MP4</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6">No jobs yet.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

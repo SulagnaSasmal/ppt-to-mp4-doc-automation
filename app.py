@@ -1,17 +1,26 @@
-import logging
-from pathlib import Path
-from typing import Dict
-from uuid import uuid4
 import json
+import logging
+import os
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
 from threading import Thread
+from typing import Any, Dict, List
+from uuid import uuid4
+
 import pythoncom
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import shutil
-import os
-from ppt_pipeline import run_pipeline
+
+from ppt_pipeline import (
+    DEFAULT_PIPELINE_SETTINGS,
+    extract_slide_notes,
+    normalize_pipeline_settings,
+    run_pipeline,
+)
 
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
@@ -21,8 +30,8 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
     handlers=[
         logging.FileHandler(LOG_DIR / "ppt_to_video.log", encoding="utf-8"),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(),
+    ],
 )
 
 logger = logging.getLogger("ppt-video-api")
@@ -33,7 +42,22 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 JOBS_DIR = BASE_DIR / "jobs"
-templates = Jinja2Templates(directory="templates")
+UPLOAD_DIR = BASE_DIR / "uploads"
+ENV_FILE = BASE_DIR / ".env"
+
+if not ENV_FILE.exists():
+    raise RuntimeError(
+        "Missing .env file. Copy .env.example to .env and set AZURE_TTS_KEY before starting the server."
+    )
+
+load_dotenv(ENV_FILE)
+
+if not os.environ.get("AZURE_TTS_KEY") or not os.environ.get("AZURE_TTS_REGION"):
+    raise RuntimeError(
+        "Missing required Azure settings in .env. Set AZURE_TTS_KEY and AZURE_TTS_REGION."
+    )
+
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app = FastAPI(
     title="PPT → Animated Video with AI Voice",
@@ -46,15 +70,35 @@ using slide animations and Azure AI voice-over from slide notes.
 2. Notes → Azure TTS
 3. FFmpeg → Final Video
 """,
-    version="1.0.0"
+    version="1.1.0",
 )
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+JOBS_DIR.mkdir(parents=True, exist_ok=True)
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-JOBS_DIR.mkdir(exist_ok=True)
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def parse_pipeline_settings(
+    voice: str,
+    speaking_rate: str,
+    resolution: int,
+    fps: int,
+    quality: int,
+) -> Dict[str, Any]:
+    return normalize_pipeline_settings(
+        {
+            "voice": voice,
+            "speaking_rate": speaking_rate,
+            "resolution": resolution,
+            "fps": fps,
+            "quality": quality,
+        }
+    )
 
 
 def persist_status(job_id: str) -> None:
@@ -67,6 +111,36 @@ def persist_status(job_id: str) -> None:
     status_path.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def load_job(job_id: str) -> dict | None:
+    if job_id in jobs:
+        return jobs[job_id]
+    status_path = JOBS_DIR / job_id / "status.json"
+    if not status_path.exists():
+        return None
+    data = json.loads(status_path.read_text(encoding="utf-8"))
+    jobs[job_id] = data
+    return data
+
+
+def list_recent_jobs(limit: int = 25) -> List[dict]:
+    records: List[dict] = []
+    for job_dir in JOBS_DIR.iterdir():
+        if not job_dir.is_dir():
+            continue
+        status_path = job_dir / "status.json"
+        if not status_path.exists():
+            continue
+        try:
+            data = json.loads(status_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        data.setdefault("job_id", job_dir.name)
+        records.append(data)
+
+    records.sort(key=lambda item: item.get("updated_at", item.get("created_at", "")), reverse=True)
+    return records[:limit]
+
+
 def append_log(job_id: str, message: str) -> None:
     job = jobs.get(job_id)
     if not job:
@@ -76,22 +150,21 @@ def append_log(job_id: str, message: str) -> None:
         return
     log_file = Path(log_path)
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    with log_file.open("a", encoding="utf-8") as f:
-        f.write(message.rstrip() + "\n")
+    with log_file.open("a", encoding="utf-8") as file_obj:
+        file_obj.write(message.rstrip() + "\n")
 
 
-@app.get("/", response_class=HTMLResponse)
-def upload_page(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
-    )
-
-def update_job(job_id: str, status: str = None, progress: int = None, message: str = None, **kwargs):
-    """Update job status and persist changes"""
+def update_job(
+    job_id: str,
+    status: str | None = None,
+    progress: int | None = None,
+    message: str | None = None,
+    **kwargs,
+) -> None:
     job = jobs.get(job_id)
     if not job:
         return
+
     if status:
         job["status"] = status
     if progress is not None:
@@ -99,170 +172,234 @@ def update_job(job_id: str, status: str = None, progress: int = None, message: s
     if message:
         job["message"] = message
         append_log(job_id, message)
+
     job.update(kwargs)
+    job["updated_at"] = utc_now_iso()
     persist_status(job_id)
 
 
-def run_conversion_async(job_id: str, ppt_path: str, job_dir: str):
-    """Run conversion in background thread with incremental status updates"""
-    # Initialize COM for this thread (required for win32com)
+def run_conversion_async(job_id: str, ppt_path: str, job_dir: str, settings: Dict[str, Any]) -> None:
     pythoncom.CoInitialize()
-    
+
     try:
-        logger.info("[%s] Step 1: Exporting animated video", job_id)
-        update_job(job_id, status="processing", progress=10, message="Exporting animated video")
+        def on_progress(stage: str, progress: int, message: str) -> None:
+            update_job(job_id, stage=stage, progress=progress, message=message)
 
-        logger.info("[%s] Step 2: Generating animated video via PowerPoint", job_id)
-        update_job(job_id, progress=30, message="Generating animated video via PowerPoint")
+        result = run_pipeline(
+            ppt_path,
+            job_dir,
+            settings=settings,
+            progress_cb=on_progress,
+        )
 
-        logger.info("[%s] Step 3: Generating Azure TTS from notes", job_id)
-        update_job(job_id, progress=60, message="Generating Azure TTS from notes")
-
-        logger.info("[%s] Step 4: FFmpeg muxing", job_id)
-        update_job(job_id, progress=85, message="FFmpeg muxing")
-
-        # Run the actual pipeline
-        output_video = run_pipeline(ppt_path, job_dir)
+        output_video = result["final_video"]
+        telemetry = result.get("telemetry", {})
 
         logger.info("[%s] Conversion completed successfully", job_id)
-        final_video_path = os.path.join(job_dir, "final.mp4")
         update_job(
             job_id,
             status="completed",
             progress=100,
             message="Video ready for download",
             output=output_video,
-            final_video_path=final_video_path
+            final_video_path=str(Path(job_dir) / "final.mp4"),
+            telemetry=telemetry,
         )
-
-    except Exception as e:
+    except Exception as exc:
         logger.exception("[%s] Conversion failed", job_id)
         update_job(
             job_id,
             status="error",
             progress=100,
-            message=f"Conversion failed: {str(e)}",
-            output=None
+            message=f"Conversion failed: {exc}",
+            output=None,
         )
     finally:
-        # Uninitialize COM
         pythoncom.CoUninitialize()
 
 
-@app.post(
-    "/convert",
-    summary="Convert PPT to animated video with voice-over",
-    description="Uploads a PPTX file and returns a job ID to track progress."
-)
-async def convert_ppt(file: UploadFile = File(...)):
-    logger.info("Received PPT upload: %s", file.filename)
-    job_id = str(uuid4())
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    os.makedirs(job_dir, exist_ok=True)
+@app.get("/", response_class=HTMLResponse)
+def upload_page(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "default_settings": DEFAULT_PIPELINE_SETTINGS,
+        },
+    )
 
-    # Initialize job
+
+@app.get("/history", response_class=HTMLResponse)
+def history_page(request: Request):
+    records = list_recent_jobs(limit=50)
+    return templates.TemplateResponse(
+        "history.html",
+        {
+            "request": request,
+            "jobs": records,
+        },
+    )
+
+
+@app.get("/api/history")
+def history_api(limit: int = 25):
+    limit = max(1, min(100, limit))
+    return {"jobs": list_recent_jobs(limit=limit)}
+
+
+@app.post("/preview-notes")
+async def preview_notes(
+    ppt: UploadFile = File(...),
+    voice: str = Form(DEFAULT_PIPELINE_SETTINGS["voice"]),
+    speaking_rate: str = Form(DEFAULT_PIPELINE_SETTINGS["speaking_rate"]),
+    resolution: int = Form(DEFAULT_PIPELINE_SETTINGS["resolution"]),
+    fps: int = Form(DEFAULT_PIPELINE_SETTINGS["fps"]),
+    quality: int = Form(DEFAULT_PIPELINE_SETTINGS["quality"]),
+):
+    settings = parse_pipeline_settings(voice, speaking_rate, resolution, fps, quality)
+
+    preview_id = str(uuid4())
+    preview_path = UPLOAD_DIR / f"preview_{preview_id}_{ppt.filename}"
+    with preview_path.open("wb") as file_obj:
+        shutil.copyfileobj(ppt.file, file_obj)
+
+    try:
+        notes = extract_slide_notes(str(preview_path))
+        notes_with_text = [item for item in notes if item["has_notes"]]
+        return {
+            "slides_total": len(notes),
+            "slides_with_notes": len(notes_with_text),
+            "settings": settings,
+            "notes": notes,
+            "can_convert": len(notes_with_text) > 0,
+        }
+    finally:
+        try:
+            preview_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+@app.post("/convert")
+async def convert_ppt(
+    ppt: UploadFile = File(...),
+    voice: str = Form(DEFAULT_PIPELINE_SETTINGS["voice"]),
+    speaking_rate: str = Form(DEFAULT_PIPELINE_SETTINGS["speaking_rate"]),
+    resolution: int = Form(DEFAULT_PIPELINE_SETTINGS["resolution"]),
+    fps: int = Form(DEFAULT_PIPELINE_SETTINGS["fps"]),
+    quality: int = Form(DEFAULT_PIPELINE_SETTINGS["quality"]),
+):
+    logger.info("Received PPT upload: %s", ppt.filename)
+
+    settings = parse_pipeline_settings(voice, speaking_rate, resolution, fps, quality)
+    job_id = str(uuid4())
+    job_dir = JOBS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
     jobs[job_id] = {
+        "job_id": job_id,
         "status": "processing",
         "stage": "upload",
         "progress": 5,
         "message": "Saving PPT",
         "output": None,
-        "log": str(JOBS_DIR / job_id / "status.log")
+        "filename": ppt.filename,
+        "settings": settings,
+        "telemetry": {},
+        "created_at": utc_now_iso(),
+        "updated_at": utc_now_iso(),
+        "log": str(job_dir / "status.log"),
     }
     persist_status(job_id)
     append_log(job_id, "Job created")
 
-    # Save uploaded file
-    ppt_path = os.path.join(UPLOAD_DIR, f"{job_id}_{file.filename}")
-    with open(ppt_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    append_log(job_id, f"Saved PPT: {file.filename}")
+    ppt_path = UPLOAD_DIR / f"{job_id}_{ppt.filename}"
+    with ppt_path.open("wb") as file_obj:
+        shutil.copyfileobj(ppt.file, file_obj)
+    append_log(job_id, f"Saved PPT: {ppt.filename}")
 
-    # Start background thread
-    thread = Thread(target=run_conversion_async, args=(job_id, ppt_path, job_dir))
+    thread = Thread(target=run_conversion_async, args=(job_id, str(ppt_path), str(job_dir), settings))
     thread.daemon = True
     thread.start()
 
-    logger.info("[%s] Background conversion started for: %s", job_id, file.filename)
-
+    logger.info("[%s] Background conversion started for: %s", job_id, ppt.filename)
     return {
         "job_id": job_id,
         "status_url": f"/status/{job_id}",
         "download_url": f"/download/{job_id}",
-        "ui_url": f"/jobs/{job_id}"
+        "logs_url": f"/logs/{job_id}",
+        "history_url": "/history",
     }
 
 
 @app.post("/convert-ui")
-async def convert_ppt_ui(request: Request, ppt: UploadFile = File(...)):
-    result = await convert_ppt(ppt)
+async def convert_ppt_ui(
+    ppt: UploadFile = File(...),
+    voice: str = Form(DEFAULT_PIPELINE_SETTINGS["voice"]),
+    speaking_rate: str = Form(DEFAULT_PIPELINE_SETTINGS["speaking_rate"]),
+    resolution: int = Form(DEFAULT_PIPELINE_SETTINGS["resolution"]),
+    fps: int = Form(DEFAULT_PIPELINE_SETTINGS["fps"]),
+    quality: int = Form(DEFAULT_PIPELINE_SETTINGS["quality"]),
+):
+    result = await convert_ppt(ppt, voice, speaking_rate, resolution, fps, quality)
     return JSONResponse(result)
 
 
 @app.get("/status/{job_id}")
-async def get_status(job_id: str):
-    job = jobs.get(job_id)
+def get_status(job_id: str):
+    job = load_job(job_id)
     if job:
         return job
-    status_path = JOBS_DIR / job_id / "status.json"
-    if status_path.exists():
-        return json.loads(status_path.read_text(encoding="utf-8"))
     raise HTTPException(status_code=404, detail="Job not found")
 
 
 @app.get("/logs/{job_id}")
 def get_logs(job_id: str, download: bool = False):
-    status_path = JOBS_DIR / job_id / "status.json"
-    if not status_path.exists():
+    job = load_job(job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    data = json.loads(status_path.read_text(encoding="utf-8"))
-    log_file = data.get("log")
+
+    log_file = job.get("log")
     if not log_file or not Path(log_file).exists():
         return PlainTextResponse("")
+
     if download:
         return FileResponse(
             log_file,
             filename=f"{job_id}_logs.txt",
-            media_type="text/plain"
+            media_type="text/plain",
         )
+
     return PlainTextResponse(Path(log_file).read_text(encoding="utf-8"))
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
 def job_page(request: Request, job_id: str):
-    job_dir = f"jobs/{job_id}"
-    status_file = f"{job_dir}/status.json"
-
-    status = "processing"
-    if os.path.exists(status_file):
-        with open(status_file, encoding="utf-8") as f:
-            status = json.load(f).get("status", "processing")
+    job = load_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
     return templates.TemplateResponse(
         "job.html",
         {
             "request": request,
             "job_id": job_id,
-            "status": status
-        }
+            "status": job.get("status", "processing"),
+        },
     )
 
 
 @app.get("/download/{job_id}")
 def download_video(job_id: str):
-    """
-    Download the final MP4 for a completed job
-    """
-    video_path = os.path.join("jobs", job_id, "final.mp4")
-
-    if not os.path.exists(video_path):
+    video_path = JOBS_DIR / job_id / "final.mp4"
+    if not video_path.exists():
         return {
             "status": "error",
-            "message": "Video not found. Job may not be completed yet."
+            "message": "Video not found. Job may not be completed yet.",
         }
 
     return FileResponse(
-        path=video_path,
+        path=str(video_path),
         media_type="video/mp4",
-        filename="presentation.mp4"
+        filename="presentation.mp4",
     )
