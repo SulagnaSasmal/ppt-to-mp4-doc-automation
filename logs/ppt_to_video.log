@@ -307,3 +307,53 @@ pywintypes.com_error: (-2147352567, 'Exception occurred.', (0, 'Microsoft PowerP
 2026-02-20 18:00:58,335 | INFO | Received PPT upload: my_presentation.pptx
 2026-02-20 18:00:58,386 | INFO | [578e32dc-2d5e-4cf3-be73-8a00fd483c70] Background conversion started for: my_presentation.pptx
 2026-02-20 18:03:30,843 | INFO | [578e32dc-2d5e-4cf3-be73-8a00fd483c70] Conversion completed successfully
+2026-02-20 18:30:58,801 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 18:30:58,858 | INFO | [75754f4b-bc94-4442-8e1d-f0f44da6086f] Background conversion started for: my_presentation.pptx
+2026-02-20 18:34:08,039 | INFO | [75754f4b-bc94-4442-8e1d-f0f44da6086f] Conversion completed successfully
+2026-02-20 19:11:10,962 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 19:11:11,105 | INFO | [7c009281-8206-448a-922c-053012c36376] Background conversion started for: my_presentation.pptx
+2026-02-20 19:12:46,363 | ERROR | [7c009281-8206-448a-922c-053012c36376] Conversion failed
+Traceback (most recent call last):
+  File "D:\ppt-video-phase1-API\app.py", line 188, in run_conversion_async
+    result = run_pipeline(
+             ^^^^^^^^^^^^^
+  File "D:\ppt-video-phase1-API\ppt_pipeline.py", line 293, in run_pipeline
+    status = presentation.CreateVideoStatus
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ppt-video-phase1-API\.venv\Lib\site-packages\win32com\client\dynamic.py", line 620, in __getattr__
+    ret = self._oleobj_.Invoke(retEntry.dispid, 0, invoke_type, 1)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pywintypes.com_error: (-2147418111, 'Call was rejected by callee.', None, None)
+2026-02-20 19:14:13,150 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-20 19:14:13,201 | INFO | [17ffa34b-c83a-4d68-bea5-7a0df095c434] Background conversion started for: my_presentation.pptx
+2026-02-20 19:16:36,708 | INFO | [17ffa34b-c83a-4d68-bea5-7a0df095c434] Conversion completed successfully
+2026-02-21 00:38:11,480 | INFO | Received PPT upload: my_presentation.pptx
+2026-02-21 00:38:11,617 | INFO | [1a1765a7-5fcc-4ea5-8c11-1a9d6fc5d545] Background conversion started for: my_presentation.pptx
+2026-02-21 00:41:19,524 | INFO | [1a1765a7-5fcc-4ea5-8c11-1a9d6fc5d545] Conversion completed successfully
+2026-02-25 15:44:05,879 | INFO | Received PPT upload: DFM_DataStream_Animated.pptx
+2026-02-25 15:44:06,100 | INFO | [6ff93839-2858-4faa-87a5-2e3ba2819d13] Background conversion started for: DFM_DataStream_Animated.pptx
+2026-02-25 15:44:13,053 | ERROR | [6ff93839-2858-4faa-87a5-2e3ba2819d13] Conversion failed
+Traceback (most recent call last):
+  File "D:\ppt-video-phase1-API\app.py", line 188, in run_conversion_async
+    result = run_pipeline(
+             ^^^^^^^^^^^^^
+  File "D:\ppt-video-phase1-API\ppt_pipeline.py", line 216, in run_pipeline
+    r.raise_for_status()
+  File "D:\ppt-video-phase1-API\.venv\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://eastus.tts.speech.microsoft.com/cognitiveservices/v1
+2026-02-25 16:08:43,015 | INFO | Received PPT upload: DFM_Final.pptx
+2026-02-25 16:08:43,287 | INFO | [26fc2d67-46f9-4e4c-a528-4c2245da85b9] Background conversion started for: DFM_Final.pptx
+2026-02-25 16:08:45,794 | ERROR | [26fc2d67-46f9-4e4c-a528-4c2245da85b9] Conversion failed
+Traceback (most recent call last):
+  File "D:\ppt-video-phase1-API\app.py", line 188, in run_conversion_async
+    result = run_pipeline(
+             ^^^^^^^^^^^^^
+  File "D:\ppt-video-phase1-API\ppt_pipeline.py", line 216, in run_pipeline
+    r.raise_for_status()
+  File "D:\ppt-video-phase1-API\.venv\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://eastus.tts.speech.microsoft.com/cognitiveservices/v1
+2026-02-25 16:14:26,676 | INFO | Received PPT upload: DFM_Final.pptx
+2026-02-25 16:14:26,727 | INFO | [9e1253bc-2862-45ad-bdee-8cee27de655f] Background conversion started for: DFM_Final.pptx
+2026-02-25 16:16:25,300 | INFO | [9e1253bc-2862-45ad-bdee-8cee27de655f] Conversion completed successfully

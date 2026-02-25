@@ -1,0 +1,26 @@
+{
+  "job_id": "9e1253bc-2862-45ad-bdee-8cee27de655f",
+  "status": "completed",
+  "stage": "mux",
+  "progress": 100,
+  "message": "Video ready for download",
+  "output": "D:\\ppt-video-phase1-API\\jobs\\9e1253bc-2862-45ad-bdee-8cee27de655f\\final.mp4",
+  "filename": "DFM_Final.pptx",
+  "settings": {
+    "voice": "en-US-JennyNeural",
+    "speaking_rate": "0%",
+    "resolution": 1080,
+    "fps": 30,
+    "quality": 80
+  },
+  "telemetry": {
+    "tts_seconds": 48.31,
+    "ppt_export_seconds": 53.59,
+    "mux_seconds": 12.6,
+    "total_seconds": 115.88
+  },
+  "created_at": "2026-02-25T10:44:26.679848+00:00",
+  "updated_at": "2026-02-25T10:46:25.306250+00:00",
+  "log": "D:\\ppt-video-phase1-API\\jobs\\9e1253bc-2862-45ad-bdee-8cee27de655f\\status.log",
+  "final_video_path": "D:\\ppt-video-phase1-API\\jobs\\9e1253bc-2862-45ad-bdee-8cee27de655f\\final.mp4"
+}
