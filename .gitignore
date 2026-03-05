@@ -17,3 +17,13 @@ dist/
 
 # Local secrets
 .env
+# Job output folders
+jobs/
+uploads/
+
+# Temporary PPTX files created during conversion
+*.tmp.pptx
+tmp_for_video_*.pptx
+
+# VS Code
+.vscode/
