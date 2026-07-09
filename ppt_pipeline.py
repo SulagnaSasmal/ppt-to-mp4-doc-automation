@@ -29,7 +29,7 @@ ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_MODEL = "claude-sonnet-5"
 
 DEFAULT_PIPELINE_SETTINGS = {
-    "tts_provider": "elevenlabs",  # "elevenlabs" | "azure"
+    "tts_provider": "azure",  # "elevenlabs" | "azure" - default to azure until ElevenLabs free-tier quota resets (2026-08-01)
     "voice": VOICE,
     "elevenlabs_voice_id": DEFAULT_ELEVENLABS_VOICE_ID,
     "elevenlabs_model": DEFAULT_ELEVENLABS_MODEL,
