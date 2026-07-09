@@ -149,6 +149,24 @@ def normalize_pipeline_settings(settings: Optional[Dict[str, Any]] = None) -> Di
     return merged
 
 
+def list_elevenlabs_voices(api_key: str) -> List[Dict[str, Any]]:
+    """List voices already available on this ElevenLabs account (no TTS quota used)."""
+    url = f"{ELEVENLABS_API_BASE}/voices"
+    headers = {"xi-api-key": api_key}
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+    data = r.json()
+    return [
+        {
+            "voice_id": v.get("voice_id"),
+            "name": v.get("name"),
+            "category": v.get("category"),
+            "description": (v.get("labels") or {}).get("description") or "",
+        }
+        for v in data.get("voices", [])
+    ]
+
+
 def synthesize_elevenlabs_tts(
     text: str,
     out_path: Path,

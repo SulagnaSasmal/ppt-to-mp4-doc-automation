@@ -21,6 +21,7 @@ from ppt_pipeline import (
     DEFAULT_PIPELINE_SETTINGS,
     extract_slide_notes,
     generate_voice_previews,
+    list_elevenlabs_voices,
     normalize_pipeline_settings,
     rewrite_notes_with_claude,
     run_pipeline,
@@ -397,6 +398,18 @@ async def convert_ppt_ui(
         ppt, voice, speaking_rate, resolution, fps, quality, tts_provider, elevenlabs_voice_id, notes_json
     )
     return JSONResponse(result)
+
+
+@app.get("/voices")
+def list_voices():
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Missing ELEVENLABS_API_KEY in .env")
+    try:
+        voices = list_elevenlabs_voices(api_key)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Could not list ElevenLabs voices: {exc}") from exc
+    return {"voices": voices}
 
 
 @app.post("/rewrite-notes")

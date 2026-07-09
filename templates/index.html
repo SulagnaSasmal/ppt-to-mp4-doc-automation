@@ -75,9 +75,11 @@
       <div class="control-group" id="elevenlabs-voice-group">
         <label>
           <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          ElevenLabs Voice ID
+          ElevenLabs Voice
         </label>
-        <input id="elevenlabs-voice-id" type="text" value="{{ default_settings.elevenlabs_voice_id }}" placeholder="Voice ID" />
+        <select id="elevenlabs-voice-id">
+          <option value="{{ default_settings.elevenlabs_voice_id }}">Loading voices…</option>
+        </select>
       </div>
 
       <div class="control-group">
@@ -298,6 +300,31 @@ function syncProviderVisibility() {
 ttsProviderSel.addEventListener("change", syncProviderVisibility);
 syncProviderVisibility();
 
+/* --- Load ElevenLabs voices into the dropdown (no TTS quota used) --- */
+const DEFAULT_ELEVENLABS_VOICE_ID = "{{ default_settings.elevenlabs_voice_id }}";
+
+async function loadElevenLabsVoices() {
+  try {
+    const res = await fetch("/voices");
+    const data = await res.json();
+    if (!res.ok) {
+      elVoiceIdInput.innerHTML = `<option value="${DEFAULT_ELEVENLABS_VOICE_ID}">Could not load voices - using default</option>`;
+      return;
+    }
+    const voices = data.voices || [];
+    elVoiceIdInput.innerHTML = voices.map(v => {
+      const label = v.description ? `${v.name} - ${v.description}` : v.name;
+      return `<option value="${v.voice_id}">${label}</option>`;
+    }).join("");
+    if (voices.some(v => v.voice_id === DEFAULT_ELEVENLABS_VOICE_ID)) {
+      elVoiceIdInput.value = DEFAULT_ELEVENLABS_VOICE_ID;
+    }
+  } catch (_) {
+    elVoiceIdInput.innerHTML = `<option value="${DEFAULT_ELEVENLABS_VOICE_ID}">Could not load voices - using default</option>`;
+  }
+}
+loadElevenLabsVoices();
+
 /* --- Range slider sync --- */
 function syncRate() {
   const v = rateRange.value;
@@ -478,6 +505,10 @@ function renderVoiceDesignResults(previews, description) {
         });
         const data = await res.json();
         if (!res.ok) { alert(data.detail || "Could not save voice"); return; }
+        const opt = document.createElement("option");
+        opt.value = data.voice_id;
+        opt.textContent = `${data.name} (custom)`;
+        elVoiceIdInput.appendChild(opt);
         elVoiceIdInput.value = data.voice_id;
         ttsProviderSel.value = "elevenlabs";
         syncProviderVisibility();
