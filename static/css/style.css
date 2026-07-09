@@ -804,6 +804,24 @@ a:hover { color: #c7d2fe; }
   white-space: pre-wrap;
 }
 
+.note-text-edit {
+  width: 100%;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+#voice-design-results audio {
+  width: 100%;
+  margin: 6px 0;
+}
+
 /* --- Telemetry --- */
 .telemetry-bar {
   margin-top: var(--sp-2);

@@ -5,21 +5,26 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Thread
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import pythoncom
+import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from ppt_pipeline import (
     DEFAULT_PIPELINE_SETTINGS,
     extract_slide_notes,
+    generate_voice_previews,
     normalize_pipeline_settings,
+    rewrite_notes_with_claude,
     run_pipeline,
+    save_designed_voice,
 )
 
 LOG_DIR = Path("logs")
@@ -47,14 +52,18 @@ ENV_FILE = BASE_DIR / ".env"
 
 if not ENV_FILE.exists():
     raise RuntimeError(
-        "Missing .env file. Copy .env.example to .env and set AZURE_TTS_KEY before starting the server."
+        "Missing .env file. Copy .env.example to .env and set a TTS provider's credentials "
+        "before starting the server."
     )
 
 load_dotenv(ENV_FILE)
 
-if not os.environ.get("AZURE_TTS_KEY") or not os.environ.get("AZURE_TTS_REGION"):
+_has_elevenlabs = bool(os.environ.get("ELEVENLABS_API_KEY"))
+_has_azure = bool(os.environ.get("AZURE_TTS_KEY") and os.environ.get("AZURE_TTS_REGION"))
+if not _has_elevenlabs and not _has_azure:
     raise RuntimeError(
-        "Missing required Azure settings in .env. Set AZURE_TTS_KEY and AZURE_TTS_REGION."
+        "Missing TTS credentials in .env. Set either ELEVENLABS_API_KEY, or "
+        "AZURE_TTS_KEY and AZURE_TTS_REGION."
     )
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -89,6 +98,8 @@ def parse_pipeline_settings(
     resolution: int,
     fps: int,
     quality: int,
+    tts_provider: str = DEFAULT_PIPELINE_SETTINGS["tts_provider"],
+    elevenlabs_voice_id: str = DEFAULT_PIPELINE_SETTINGS["elevenlabs_voice_id"],
 ) -> Dict[str, Any]:
     return normalize_pipeline_settings(
         {
@@ -97,8 +108,26 @@ def parse_pipeline_settings(
             "resolution": resolution,
             "fps": fps,
             "quality": quality,
+            "tts_provider": tts_provider,
+            "elevenlabs_voice_id": elevenlabs_voice_id,
         }
     )
+
+
+class RewriteNotesRequest(BaseModel):
+    notes: List[Dict[str, Any]]
+    instruction: str
+
+
+class VoiceDesignPreviewRequest(BaseModel):
+    description: str
+    sample_text: Optional[str] = None
+
+
+class VoiceDesignSaveRequest(BaseModel):
+    name: str
+    description: str
+    generated_voice_id: str
 
 
 def persist_status(job_id: str) -> None:
@@ -178,7 +207,13 @@ def update_job(
     persist_status(job_id)
 
 
-def run_conversion_async(job_id: str, ppt_path: str, job_dir: str, settings: Dict[str, Any]) -> None:
+def run_conversion_async(
+    job_id: str,
+    ppt_path: str,
+    job_dir: str,
+    settings: Dict[str, Any],
+    notes_override: Optional[List[Dict[str, Any]]] = None,
+) -> None:
     pythoncom.CoInitialize()
 
     try:
@@ -190,6 +225,7 @@ def run_conversion_async(job_id: str, ppt_path: str, job_dir: str, settings: Dic
             job_dir,
             settings=settings,
             progress_cb=on_progress,
+            notes_override=notes_override,
         )
 
         output_video = result["final_video"]
@@ -221,9 +257,9 @@ def run_conversion_async(job_id: str, ppt_path: str, job_dir: str, settings: Dic
 @app.get("/", response_class=HTMLResponse)
 def upload_page(request: Request):
     return templates.TemplateResponse(
+        request,
         "index.html",
         {
-            "request": request,
             "default_settings": DEFAULT_PIPELINE_SETTINGS,
         },
     )
@@ -233,9 +269,9 @@ def upload_page(request: Request):
 def history_page(request: Request):
     records = list_recent_jobs(limit=50)
     return templates.TemplateResponse(
+        request,
         "history.html",
         {
-            "request": request,
             "jobs": records,
         },
     )
@@ -255,8 +291,12 @@ async def preview_notes(
     resolution: int = Form(DEFAULT_PIPELINE_SETTINGS["resolution"]),
     fps: int = Form(DEFAULT_PIPELINE_SETTINGS["fps"]),
     quality: int = Form(DEFAULT_PIPELINE_SETTINGS["quality"]),
+    tts_provider: str = Form(DEFAULT_PIPELINE_SETTINGS["tts_provider"]),
+    elevenlabs_voice_id: str = Form(DEFAULT_PIPELINE_SETTINGS["elevenlabs_voice_id"]),
 ):
-    settings = parse_pipeline_settings(voice, speaking_rate, resolution, fps, quality)
+    settings = parse_pipeline_settings(
+        voice, speaking_rate, resolution, fps, quality, tts_provider, elevenlabs_voice_id
+    )
 
     preview_id = str(uuid4())
     preview_path = UPLOAD_DIR / f"preview_{preview_id}_{ppt.filename}"
@@ -288,10 +328,16 @@ async def convert_ppt(
     resolution: int = Form(DEFAULT_PIPELINE_SETTINGS["resolution"]),
     fps: int = Form(DEFAULT_PIPELINE_SETTINGS["fps"]),
     quality: int = Form(DEFAULT_PIPELINE_SETTINGS["quality"]),
+    tts_provider: str = Form(DEFAULT_PIPELINE_SETTINGS["tts_provider"]),
+    elevenlabs_voice_id: str = Form(DEFAULT_PIPELINE_SETTINGS["elevenlabs_voice_id"]),
+    notes_json: Optional[str] = Form(None),
 ):
     logger.info("Received PPT upload: %s", ppt.filename)
 
-    settings = parse_pipeline_settings(voice, speaking_rate, resolution, fps, quality)
+    settings = parse_pipeline_settings(
+        voice, speaking_rate, resolution, fps, quality, tts_provider, elevenlabs_voice_id
+    )
+    notes_override = json.loads(notes_json) if notes_json else None
     job_id = str(uuid4())
     job_dir = JOBS_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -318,7 +364,10 @@ async def convert_ppt(
         shutil.copyfileobj(ppt.file, file_obj)
     append_log(job_id, f"Saved PPT: {ppt.filename}")
 
-    thread = Thread(target=run_conversion_async, args=(job_id, str(ppt_path), str(job_dir), settings))
+    thread = Thread(
+        target=run_conversion_async,
+        args=(job_id, str(ppt_path), str(job_dir), settings, notes_override),
+    )
     thread.daemon = True
     thread.start()
 
@@ -340,9 +389,50 @@ async def convert_ppt_ui(
     resolution: int = Form(DEFAULT_PIPELINE_SETTINGS["resolution"]),
     fps: int = Form(DEFAULT_PIPELINE_SETTINGS["fps"]),
     quality: int = Form(DEFAULT_PIPELINE_SETTINGS["quality"]),
+    tts_provider: str = Form(DEFAULT_PIPELINE_SETTINGS["tts_provider"]),
+    elevenlabs_voice_id: str = Form(DEFAULT_PIPELINE_SETTINGS["elevenlabs_voice_id"]),
+    notes_json: Optional[str] = Form(None),
 ):
-    result = await convert_ppt(ppt, voice, speaking_rate, resolution, fps, quality)
+    result = await convert_ppt(
+        ppt, voice, speaking_rate, resolution, fps, quality, tts_provider, elevenlabs_voice_id, notes_json
+    )
     return JSONResponse(result)
+
+
+@app.post("/rewrite-notes")
+def rewrite_notes(payload: RewriteNotesRequest):
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Missing ANTHROPIC_API_KEY in .env")
+    try:
+        rewritten = rewrite_notes_with_claude(payload.notes, payload.instruction, api_key)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Rewrite failed: {exc}") from exc
+    return {"notes": rewritten}
+
+
+@app.post("/voice-design/preview")
+def voice_design_preview(payload: VoiceDesignPreviewRequest):
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Missing ELEVENLABS_API_KEY in .env")
+    try:
+        result = generate_voice_previews(payload.description, api_key, payload.sample_text)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"ElevenLabs preview failed: {exc}") from exc
+    return result
+
+
+@app.post("/voice-design/save")
+def voice_design_save(payload: VoiceDesignSaveRequest):
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Missing ELEVENLABS_API_KEY in .env")
+    try:
+        result = save_designed_voice(payload.name, payload.description, payload.generated_voice_id, api_key)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"ElevenLabs save-voice failed: {exc}") from exc
+    return result
 
 
 @app.get("/status/{job_id}")
@@ -380,9 +470,9 @@ def job_page(request: Request, job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
 
     return templates.TemplateResponse(
+        request,
         "job.html",
         {
-            "request": request,
             "job_id": job_id,
             "status": job.get("status", "processing"),
         },

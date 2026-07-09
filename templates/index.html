@@ -56,9 +56,28 @@
       <div class="control-group">
         <label>
           <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          Voice Selection
+          TTS Provider
+        </label>
+        <select id="tts-provider">
+          <option value="elevenlabs" {{ 'selected' if default_settings.tts_provider == 'elevenlabs' }}>ElevenLabs (recommended)</option>
+          <option value="azure" {{ 'selected' if default_settings.tts_provider == 'azure' }}>Azure (Jenny Neural)</option>
+        </select>
+      </div>
+
+      <div class="control-group" id="azure-voice-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          Azure Voice
         </label>
         <input id="voice" type="text" value="{{ default_settings.voice }}" placeholder="e.g. en-US-JennyNeural" />
+      </div>
+
+      <div class="control-group" id="elevenlabs-voice-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          ElevenLabs Voice ID
+        </label>
+        <input id="elevenlabs-voice-id" type="text" value="{{ default_settings.elevenlabs_voice_id }}" placeholder="Voice ID" />
       </div>
 
       <div class="control-group">
@@ -98,6 +117,38 @@
         </select>
       </div>
     </div>
+
+    <!-- ── Voice Design (prompt-based) ── -->
+    <details id="voice-design-panel" class="preview-panel">
+      <summary>
+        <svg class="chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        Design a Voice with a Prompt (ElevenLabs)
+      </summary>
+      <div class="preview-body">
+        <div class="control-group">
+          <label>Describe the voice you want</label>
+          <input id="voice-design-desc" type="text" placeholder="e.g. Deep, warm, confident male narrator with a slight British accent" />
+        </div>
+        <button id="voice-design-btn" type="button" class="btn btn-secondary">Generate Voice Previews</button>
+        <div id="voice-design-results" class="preview-notes"></div>
+      </div>
+    </details>
+
+    <!-- ── Prompt-based Script Editing ── -->
+    <details id="script-edit-panel" class="preview-panel">
+      <summary>
+        <svg class="chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        Edit Narration with a Prompt
+      </summary>
+      <div class="preview-body">
+        <div class="control-group">
+          <label>Instruction (applies to all slide notes)</label>
+          <input id="rewrite-instruction" type="text" placeholder="e.g. Make this more energetic and concise" />
+        </div>
+        <button id="rewrite-btn" type="button" class="btn btn-secondary">Rewrite with AI</button>
+        <p class="upload-hint">Run "Preview Notes" first so there's narration text to rewrite.</p>
+      </div>
+    </details>
 
     <!-- ── Action Row ── -->
     <div class="action-row">
@@ -210,6 +261,7 @@
 let jobId       = null;
 let pollInterval = null;
 let logInterval  = null;
+let currentNotes = null;
 
 /* --- DOM refs --- */
 const uploadForm      = document.getElementById("uploadForm");
@@ -227,6 +279,24 @@ const errorToast      = document.getElementById("error-toast");
 const rateRange       = document.getElementById("speaking-rate-range");
 const rateValue       = document.getElementById("rate-value");
 const rateHidden      = document.getElementById("speaking-rate");
+const ttsProviderSel  = document.getElementById("tts-provider");
+const azureVoiceGroup = document.getElementById("azure-voice-group");
+const elVoiceGroup    = document.getElementById("elevenlabs-voice-group");
+const elVoiceIdInput  = document.getElementById("elevenlabs-voice-id");
+const voiceDesignBtn  = document.getElementById("voice-design-btn");
+const voiceDesignDesc = document.getElementById("voice-design-desc");
+const voiceDesignRes  = document.getElementById("voice-design-results");
+const rewriteBtn      = document.getElementById("rewrite-btn");
+const rewriteInput    = document.getElementById("rewrite-instruction");
+
+/* --- TTS provider toggle --- */
+function syncProviderVisibility() {
+  const isEleven = ttsProviderSel.value === "elevenlabs";
+  elVoiceGroup.style.display = isEleven ? "" : "none";
+  azureVoiceGroup.style.display = isEleven ? "none" : "";
+}
+ttsProviderSel.addEventListener("change", syncProviderVisibility);
+syncProviderVisibility();
 
 /* --- Range slider sync --- */
 function syncRate() {
@@ -251,7 +321,9 @@ function readSettings() {
     speaking_rate: rateHidden.value,
     resolution:    document.getElementById("resolution").value,
     fps:           document.getElementById("fps").value,
-    quality:       80
+    quality:       80,
+    tts_provider:  ttsProviderSel.value,
+    elevenlabs_voice_id: elVoiceIdInput.value
   };
 }
 
@@ -260,6 +332,7 @@ function buildFormData() {
   if (fileInput.files[0]) fd.append("ppt", fileInput.files[0]);
   const s = readSettings();
   Object.keys(s).forEach(k => fd.append(k, s[k]));
+  if (currentNotes) fd.append("notes_json", JSON.stringify(currentNotes));
   return fd;
 }
 
@@ -297,14 +370,28 @@ function renderPreview(data) {
   previewMeta.innerHTML = [
     `<span class="meta-chip">Slides: ${data.slides_total}</span>`,
     `<span class="meta-chip">With notes: ${data.slides_with_notes}</span>`,
-    `<span class="meta-chip">Voice: ${data.settings.voice}</span>`,
+    `<span class="meta-chip">Voice: ${data.settings.tts_provider === 'elevenlabs' ? data.settings.elevenlabs_voice_id : data.settings.voice}</span>`,
     `<span class="meta-chip">Rate: ${data.settings.speaking_rate}</span>`
   ].join("");
 
-  previewNotes.innerHTML = data.notes.map(n => {
-    const text = n.text ? n.text.replaceAll("<","&lt;") : "(No notes on this slide)";
-    return `<div class="note-item"><div class="note-head">Slide ${n.slide}</div><div class="note-text">${text}</div></div>`;
+  currentNotes = data.notes;
+  renderNoteEditors();
+}
+
+function renderNoteEditors() {
+  previewNotes.innerHTML = (currentNotes || []).map(n => {
+    const text = n.text || "";
+    return `<div class="note-item"><div class="note-head">Slide ${n.slide}</div>` +
+      `<textarea class="note-text-edit" data-slide="${n.slide}" rows="3" placeholder="(No notes on this slide)">${text.replaceAll("<","&lt;")}</textarea></div>`;
   }).join("") || '<div class="note-item">No slides found.</div>';
+
+  previewNotes.querySelectorAll(".note-text-edit").forEach(ta => {
+    ta.addEventListener("input", () => {
+      const slide = parseInt(ta.dataset.slide, 10);
+      const item = currentNotes.find(n => n.slide === slide);
+      if (item) { item.text = ta.value; item.has_notes = !!ta.value; }
+    });
+  });
 }
 
 previewBtn.addEventListener("click", async () => {
@@ -317,6 +404,91 @@ previewBtn.addEventListener("click", async () => {
   renderPreview(data);
   if (!data.can_convert) alert("No slide notes found. Add notes to at least one slide before converting.");
 });
+
+/* --- Prompt-based script rewriting --- */
+rewriteBtn.addEventListener("click", async () => {
+  if (!currentNotes) { alert("Run Preview Notes first."); return; }
+  const instruction = rewriteInput.value.trim();
+  if (!instruction) { alert("Enter an instruction first."); return; }
+  rewriteBtn.disabled = true;
+  rewriteBtn.textContent = "Rewriting…";
+  try {
+    const res = await fetch("/rewrite-notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: currentNotes, instruction })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.detail || "Rewrite failed"); return; }
+    currentNotes = data.notes;
+    renderNoteEditors();
+    previewPanel.classList.remove("hidden");
+    previewPanel.open = true;
+  } finally {
+    rewriteBtn.disabled = false;
+    rewriteBtn.textContent = "Rewrite with AI";
+  }
+});
+
+/* --- Prompt-based voice design (ElevenLabs) --- */
+voiceDesignBtn.addEventListener("click", async () => {
+  const description = voiceDesignDesc.value.trim();
+  if (!description) { alert("Describe the voice you want first."); return; }
+  voiceDesignBtn.disabled = true;
+  voiceDesignBtn.textContent = "Generating…";
+  try {
+    const res = await fetch("/voice-design/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.detail || "Voice preview generation failed"); return; }
+    renderVoiceDesignResults(data.previews || [], description);
+  } finally {
+    voiceDesignBtn.disabled = false;
+    voiceDesignBtn.textContent = "Generate Voice Previews";
+  }
+});
+
+function renderVoiceDesignResults(previews, description) {
+  if (!previews.length) {
+    voiceDesignRes.innerHTML = '<div class="note-item">No previews returned.</div>';
+    return;
+  }
+  voiceDesignRes.innerHTML = previews.map((p, idx) => `
+    <div class="note-item" data-idx="${idx}">
+      <div class="note-head">Preview ${idx + 1}</div>
+      <audio controls src="data:audio/mpeg;base64,${p.audio_base_64}"></audio>
+      <button type="button" class="btn btn-secondary use-voice-btn" data-gen-id="${p.generated_voice_id}">Use this voice</button>
+    </div>
+  `).join("");
+
+  voiceDesignRes.querySelectorAll(".use-voice-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const name = prompt("Name this voice:", "Custom Voice");
+      if (!name) return;
+      btn.disabled = true;
+      btn.textContent = "Saving…";
+      try {
+        const res = await fetch("/voice-design/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, description, generated_voice_id: btn.dataset.genId })
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.detail || "Could not save voice"); return; }
+        elVoiceIdInput.value = data.voice_id;
+        ttsProviderSel.value = "elevenlabs";
+        syncProviderVisibility();
+        alert(`Voice "${name}" saved and selected.`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Use this voice";
+      }
+    });
+  });
+}
 
 /* --- Stepper --- */
 function setStepper(stage, pct) {
@@ -501,10 +673,15 @@ function resetTask() {
   previewPanel.open = false;
   previewMeta.innerHTML = "";
   previewNotes.innerHTML = "";
+  currentNotes = null;
+  voiceDesignRes.innerHTML = "";
+  voiceDesignDesc.value = "";
+  rewriteInput.value = "";
 
   uploadForm.reset();
   showSelectedFile(null);
   syncRate();
+  syncProviderVisibility();
 }
 </script>
 

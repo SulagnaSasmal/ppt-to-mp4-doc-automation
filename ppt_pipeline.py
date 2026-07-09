@@ -1,12 +1,15 @@
 import win32com.client
 import subprocess
 import os
+import json
+import struct
 import time
 import shutil
+import zipfile
 from pathlib import Path
 from functools import lru_cache
 import requests
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Any, List, Optional
 
 # Use numeric constant to avoid makepy dependency when constants are unavailable
 PPT_ADVANCE_USE_TIMINGS = 3  # ppSlideShowUseSlideTimings
@@ -14,8 +17,22 @@ DEFAULT_SILENCE_HEAD = 0.0
 DEFAULT_SILENCE_TAIL = 0.0
 VOICE = "en-US-JennyNeural"
 FFMPEG_BIN_DIR_ENV = "FFMPEG_BIN_DIR"
+
+ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1"
+# "George" - warm, captivating storyteller. Free-tier API access requires a voice
+# already present in the account's own voice list (GET /v1/voices), not just any
+# id from ElevenLabs' shared Voice Library - those 402 with "paid_plan_required".
+DEFAULT_ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
+DEFAULT_ELEVENLABS_MODEL = "eleven_multilingual_v2"
+
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_MODEL = "claude-sonnet-5"
+
 DEFAULT_PIPELINE_SETTINGS = {
+    "tts_provider": "elevenlabs",  # "elevenlabs" | "azure"
     "voice": VOICE,
+    "elevenlabs_voice_id": DEFAULT_ELEVENLABS_VOICE_ID,
+    "elevenlabs_model": DEFAULT_ELEVENLABS_MODEL,
     "speaking_rate": "0%",
     "resolution": 1080,
     "fps": 30,
@@ -119,7 +136,12 @@ def normalize_pipeline_settings(settings: Optional[Dict[str, Any]] = None) -> Di
     if settings:
         merged.update({k: v for k, v in settings.items() if v is not None})
 
+    merged["tts_provider"] = str(merged["tts_provider"]).strip().lower() or "elevenlabs"
+    if merged["tts_provider"] not in ("elevenlabs", "azure"):
+        merged["tts_provider"] = "elevenlabs"
     merged["voice"] = str(merged["voice"]).strip() or VOICE
+    merged["elevenlabs_voice_id"] = str(merged["elevenlabs_voice_id"]).strip() or DEFAULT_ELEVENLABS_VOICE_ID
+    merged["elevenlabs_model"] = str(merged["elevenlabs_model"]).strip() or DEFAULT_ELEVENLABS_MODEL
     merged["speaking_rate"] = str(merged["speaking_rate"]).strip() or "0%"
     merged["resolution"] = max(240, min(2160, int(merged["resolution"])))
     merged["fps"] = max(1, min(60, int(merged["fps"])))
@@ -127,10 +149,191 @@ def normalize_pipeline_settings(settings: Optional[Dict[str, Any]] = None) -> Di
     return merged
 
 
+def synthesize_elevenlabs_tts(
+    text: str,
+    out_path: Path,
+    voice_id: str,
+    api_key: str,
+    model_id: str = DEFAULT_ELEVENLABS_MODEL,
+) -> None:
+    """Synthesize narration audio via ElevenLabs text-to-speech."""
+    url = f"{ELEVENLABS_API_BASE}/text-to-speech/{voice_id}"
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
+    payload = {
+        "text": text,
+        "model_id": model_id,
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+    }
+    r = requests.post(url, headers=headers, json=payload)
+    r.raise_for_status()
+    out_path.write_bytes(r.content)
+
+
+def generate_voice_previews(description: str, api_key: str, sample_text: Optional[str] = None) -> Dict[str, Any]:
+    """Prompt-based ElevenLabs Voice Design: generate preview clips for a described voice."""
+    url = f"{ELEVENLABS_API_BASE}/text-to-voice/create-previews"
+    headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
+    payload: Dict[str, Any] = {"voice_description": description}
+    if sample_text:
+        payload["text"] = sample_text
+    r = requests.post(url, headers=headers, json=payload)
+    r.raise_for_status()
+    return r.json()
+
+
+def save_designed_voice(name: str, description: str, generated_voice_id: str, api_key: str) -> Dict[str, Any]:
+    """Persist one of the previewed voices as a reusable ElevenLabs voice."""
+    url = f"{ELEVENLABS_API_BASE}/text-to-voice/create-voice-from-preview"
+    headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
+    payload = {
+        "voice_name": name,
+        "voice_description": description,
+        "generated_voice_id": generated_voice_id,
+    }
+    r = requests.post(url, headers=headers, json=payload)
+    r.raise_for_status()
+    return r.json()
+
+
+def rewrite_notes_with_claude(
+    notes: List[Dict[str, Any]],
+    instruction: str,
+    api_key: str,
+    model: str = ANTHROPIC_MODEL,
+) -> List[Dict[str, Any]]:
+    """Rewrite slide narration text per a free-form instruction, in one batched call."""
+    slides_payload = [
+        {"slide": item["slide"], "text": item.get("text", "")}
+        for item in notes
+        if item.get("text")
+    ]
+    if not slides_payload:
+        return [dict(item) for item in notes]
+
+    prompt = (
+        "You are editing narration scripts for a slide presentation video.\n"
+        f'Apply this instruction to every slide\'s narration: "{instruction}"\n\n'
+        "Slides (JSON array of objects with slide number and text):\n"
+        f"{json.dumps(slides_payload, ensure_ascii=False)}\n\n"
+        "Return ONLY a JSON array of the same length, same slide numbers, with the "
+        '"text" field rewritten as natural spoken narration (no markdown, no slide '
+        "labels, no quotation marks around the text). No commentary, no code fences - "
+        "raw JSON array only."
+    )
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "max_tokens": 4096,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    r = requests.post(ANTHROPIC_API_URL, headers=headers, json=payload)
+    r.raise_for_status()
+    data = r.json()
+    raw_text = "".join(
+        block.get("text", "") for block in data.get("content", []) if block.get("type") == "text"
+    ).strip()
+
+    raw_text = raw_text.strip()
+    if raw_text.startswith("```"):
+        raw_text = raw_text.strip("`")
+        if raw_text.lower().startswith("json"):
+            raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+
+    rewritten_by_slide = {int(entry["slide"]): entry["text"] for entry in json.loads(raw_text)}
+
+    results = []
+    for item in notes:
+        new_item = dict(item)
+        if item["slide"] in rewritten_by_slide:
+            new_item["text"] = rewritten_by_slide[item["slide"]].strip()
+            new_item["has_notes"] = bool(new_item["text"])
+        results.append(new_item)
+    return results
+
+
+def _raw_entry_bytes(zin: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes:
+    """Read an entry's on-disk bytes directly, bypassing zipfile's CRC check."""
+    zin.fp.seek(info.header_offset)
+    header = zin.fp.read(30)
+    name_len, extra_len = struct.unpack("<HH", header[26:30])
+    zin.fp.seek(info.header_offset + 30 + name_len + extra_len)
+    raw = zin.fp.read(info.compress_size)
+    if info.compress_type == zipfile.ZIP_STORED:
+        return raw
+    import zlib
+    return zlib.decompressobj(-15).decompress(raw)
+
+
+_CONTENT_TYPES_NAME = "[Content_Types].xml"
+_SLIDESHOW_CONTENT_TYPE = b"presentationml.slideshow.main+xml"
+_PRESENTATION_CONTENT_TYPE = b"presentationml.presentation.main+xml"
+
+
+def repair_pptx_zip(ppt_path: Path) -> Path:
+    """
+    Normalize a deck so python-pptx can parse it, handling two issues:
+
+    1. Some decks carry entries (often embedded audio/video) whose stored
+       CRC-32 no longer matches their bytes - PowerPoint opens these without
+       complaint, but Python's strict zipfile module (used by python-pptx)
+       refuses to read the archive at all.
+    2. .ppsx/.ppsm (PowerPoint Show) packages declare their main part as
+       'presentationml.slideshow.main+xml', which python-pptx's Presentation()
+       loader rejects outright even though the schema is otherwise identical
+       to .pptx. Retarget that declaration to the .pptx content type.
+
+    Returns the original path unchanged if neither issue is present.
+    """
+    with zipfile.ZipFile(ppt_path, "r") as zin:
+        bad_names = set()
+        for info in zin.infolist():
+            try:
+                zin.read(info.filename)
+            except zipfile.BadZipFile:
+                bad_names.add(info.filename)
+
+        content_types_info = zin.getinfo(_CONTENT_TYPES_NAME)
+        content_types_xml = (
+            _raw_entry_bytes(zin, content_types_info)
+            if _CONTENT_TYPES_NAME in bad_names
+            else zin.read(_CONTENT_TYPES_NAME)
+        )
+        needs_content_type_fix = _SLIDESHOW_CONTENT_TYPE in content_types_xml
+
+        if not bad_names and not needs_content_type_fix:
+            return ppt_path
+
+        if needs_content_type_fix:
+            content_types_xml = content_types_xml.replace(_SLIDESHOW_CONTENT_TYPE, _PRESENTATION_CONTENT_TYPE)
+
+        repaired_path = ppt_path.with_name(f"{ppt_path.stem}_repaired{ppt_path.suffix}")
+        with zipfile.ZipFile(repaired_path, "w", zipfile.ZIP_DEFLATED) as zout:
+            for info in zin.infolist():
+                if info.filename == _CONTENT_TYPES_NAME:
+                    data = content_types_xml
+                elif info.filename in bad_names:
+                    data = _raw_entry_bytes(zin, info)
+                else:
+                    data = zin.read(info.filename)
+                zout.writestr(info.filename, data)
+
+    return repaired_path
+
+
 def extract_slide_notes(ppt_path: str) -> list[dict]:
     from pptx import Presentation
 
-    presentation = Presentation(str(Path(ppt_path).resolve()))
+    resolved_path = repair_pptx_zip(Path(ppt_path).resolve())
+    presentation = Presentation(str(resolved_path))
     notes = []
     for index, slide in enumerate(presentation.slides, start=1):
         text = ""
@@ -149,6 +352,7 @@ def run_pipeline(
     out_dir: str,
     settings: Optional[Dict[str, Any]] = None,
     progress_cb: Optional[Callable[[str, int, str], None]] = None,
+    notes_override: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Runs:
@@ -157,6 +361,11 @@ def run_pipeline(
     - FFmpeg mux
     Returns final MP4 path
     """
+    # NOTE: PowerPoint's COM automation opens the original file directly - it already
+    # tolerates the CRC quirk that repair_pptx_zip works around, and feeding it a
+    # content-type-normalized copy instead makes PowerPoint reject the file (its
+    # outer .ppsx/.pptx extension then mismatches the internal content-type
+    # declaration). Only extract_slide_notes() (python-pptx) needs the repaired copy.
     ppt_path_obj = Path(ppt_path).resolve()
     out_dir_path = Path(out_dir).resolve()
     out_dir_path.mkdir(parents=True, exist_ok=True)
@@ -172,31 +381,38 @@ def run_pipeline(
     narration = out_dir_path / "narration.mp3"
     final_video = out_dir_path / "final.mp4"
 
-    # Check for required Azure credentials
-    azure_key = os.environ.get("AZURE_TTS_KEY")
-    azure_region = os.environ.get("AZURE_TTS_REGION")
-    
-    if not azure_key or not azure_region:
-        raise ValueError(
-            "Missing Azure TTS credentials. Please set environment variables:\n"
-            "  AZURE_TTS_KEY=<your-key>\n"
-            "  AZURE_TTS_REGION=<region> (e.g., 'eastus')\n"
-            "Before starting the server."
-        )
-    
-    tts_url = f"https://{azure_region}.tts.speech.microsoft.com/cognitiveservices/v1"
-    tts_headers = {
-        "Ocp-Apim-Subscription-Key": azure_key,
-        "Content-Type": "application/ssml+xml",
-        "X-Microsoft-OutputFormat": "audio-24khz-160kbitrate-mono-mp3",
-    }
+    tts_provider = pipeline_settings["tts_provider"]
+
+    if tts_provider == "elevenlabs":
+        elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY")
+        if not elevenlabs_key:
+            raise ValueError(
+                "Missing ElevenLabs credentials. Set ELEVENLABS_API_KEY in .env before "
+                "using the ElevenLabs voice provider."
+            )
+    else:
+        azure_key = os.environ.get("AZURE_TTS_KEY")
+        azure_region = os.environ.get("AZURE_TTS_REGION")
+        if not azure_key or not azure_region:
+            raise ValueError(
+                "Missing Azure TTS credentials. Please set environment variables:\n"
+                "  AZURE_TTS_KEY=<your-key>\n"
+                "  AZURE_TTS_REGION=<region> (e.g., 'eastus')\n"
+                "Before starting the server."
+            )
+        tts_url = f"https://{azure_region}.tts.speech.microsoft.com/cognitiveservices/v1"
+        tts_headers = {
+            "Ocp-Apim-Subscription-Key": azure_key,
+            "Content-Type": "application/ssml+xml",
+            "X-Microsoft-OutputFormat": "audio-24khz-160kbitrate-mono-mp3",
+        }
 
     report("notes", 12, "Extracting slide notes")
-    extracted_notes = extract_slide_notes(str(ppt_path_obj))
+    extracted_notes = notes_override if notes_override is not None else extract_slide_notes(str(ppt_path_obj))
     slide_notes = [(item["slide"], item["text"]) for item in extracted_notes]
 
-    # 2️⃣ Azure TTS per slide
-    report("tts", 35, "Generating Azure TTS from notes")
+    # 2️⃣ TTS per slide (ElevenLabs or Azure)
+    report("tts", 35, f"Generating {tts_provider} TTS from notes")
     tts_start = time.perf_counter()
     audio_files = []
     audio_durations = {}
@@ -204,17 +420,27 @@ def run_pipeline(
         if not text:
             continue
 
-        ssml = f"""
+        out_mp3 = (out_dir_path / f"slide_{i:02}.mp3").resolve()
+        safe_unlink(out_mp3)
+
+        if tts_provider == "elevenlabs":
+            synthesize_elevenlabs_tts(
+                text,
+                out_mp3,
+                pipeline_settings["elevenlabs_voice_id"],
+                elevenlabs_key,
+                pipeline_settings["elevenlabs_model"],
+            )
+        else:
+            ssml = f"""
 <speak version='1.0' xml:lang='en-US'>
   <voice name='{pipeline_settings['voice']}'><prosody rate='{pipeline_settings['speaking_rate']}'>{text}</prosody></voice>
 </speak>
 """
+            r = requests.post(tts_url, headers=tts_headers, data=ssml.encode("utf-8"))
+            r.raise_for_status()
+            out_mp3.write_bytes(r.content)
 
-        out_mp3 = (out_dir_path / f"slide_{i:02}.mp3").resolve()
-        safe_unlink(out_mp3)
-        r = requests.post(tts_url, headers=tts_headers, data=ssml.encode("utf-8"))
-        r.raise_for_status()
-        out_mp3.write_bytes(r.content)
         audio_files.append(out_mp3)
         audio_durations[i] = probe_duration_seconds(out_mp3)
 
