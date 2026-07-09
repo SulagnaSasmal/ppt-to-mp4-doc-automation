@@ -282,7 +282,8 @@ a:hover { color: #c7d2fe; }
 }
 
 .control-group input,
-.control-group select {
+.control-group select,
+.control-group textarea {
   width: 100%;
   padding: 10px 12px;
   background: var(--bg-input);
@@ -295,13 +296,20 @@ a:hover { color: #c7d2fe; }
   outline: none;
 }
 
+.control-group textarea {
+  resize: vertical;
+  box-sizing: border-box;
+}
+
 .control-group input:focus,
-.control-group select:focus {
+.control-group select:focus,
+.control-group textarea:focus {
   border-color: var(--indigo);
   box-shadow: 0 0 0 3px var(--indigo-glow);
 }
 
-.control-group input::placeholder {
+.control-group input::placeholder,
+.control-group textarea::placeholder {
   color: var(--text-dim);
 }
 

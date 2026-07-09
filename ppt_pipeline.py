@@ -191,6 +191,31 @@ def synthesize_elevenlabs_tts(
     out_path.write_bytes(r.content)
 
 
+def synthesize_azure_tts(
+    text: str,
+    out_path: Path,
+    voice: str,
+    api_key: str,
+    region: str,
+    speaking_rate: str = "0%",
+) -> None:
+    """Synthesize narration audio via Azure Cognitive Services text-to-speech."""
+    url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+    headers = {
+        "Ocp-Apim-Subscription-Key": api_key,
+        "Content-Type": "application/ssml+xml",
+        "X-Microsoft-OutputFormat": "audio-24khz-160kbitrate-mono-mp3",
+    }
+    ssml = f"""
+<speak version='1.0' xml:lang='en-US'>
+  <voice name='{voice}'><prosody rate='{speaking_rate}'>{text}</prosody></voice>
+</speak>
+"""
+    r = requests.post(url, headers=headers, data=ssml.encode("utf-8"))
+    r.raise_for_status()
+    out_path.write_bytes(r.content)
+
+
 def generate_voice_previews(description: str, api_key: str, sample_text: Optional[str] = None) -> Dict[str, Any]:
     """Prompt-based ElevenLabs Voice Design: generate preview clips for a described voice."""
     url = f"{ELEVENLABS_API_BASE}/text-to-voice/create-previews"
@@ -215,6 +240,37 @@ def save_designed_voice(name: str, description: str, generated_voice_id: str, ap
     r = requests.post(url, headers=headers, json=payload)
     r.raise_for_status()
     return r.json()
+
+
+def call_claude(prompt: str, api_key: str, model: str = ANTHROPIC_MODEL, max_tokens: int = 4096) -> str:
+    """Send a single-turn prompt to Claude, return the concatenated text of the response."""
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    r = requests.post(ANTHROPIC_API_URL, headers=headers, json=payload)
+    r.raise_for_status()
+    data = r.json()
+    return "".join(
+        block.get("text", "") for block in data.get("content", []) if block.get("type") == "text"
+    ).strip()
+
+
+def strip_code_fences(text: str) -> str:
+    """Strip a leading/trailing ``` or ```json fence Claude sometimes wraps JSON output in."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    return text
 
 
 def rewrite_notes_with_claude(
@@ -242,30 +298,7 @@ def rewrite_notes_with_claude(
         "labels, no quotation marks around the text). No commentary, no code fences - "
         "raw JSON array only."
     )
-    headers = {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-    payload = {
-        "model": model,
-        "max_tokens": 4096,
-        "messages": [{"role": "user", "content": prompt}],
-    }
-    r = requests.post(ANTHROPIC_API_URL, headers=headers, json=payload)
-    r.raise_for_status()
-    data = r.json()
-    raw_text = "".join(
-        block.get("text", "") for block in data.get("content", []) if block.get("type") == "text"
-    ).strip()
-
-    raw_text = raw_text.strip()
-    if raw_text.startswith("```"):
-        raw_text = raw_text.strip("`")
-        if raw_text.lower().startswith("json"):
-            raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
-
+    raw_text = strip_code_fences(call_claude(prompt, api_key, model))
     rewritten_by_slide = {int(entry["slide"]): entry["text"] for entry in json.loads(raw_text)}
 
     results = []
@@ -418,13 +451,6 @@ def run_pipeline(
                 "  AZURE_TTS_REGION=<region> (e.g., 'eastus')\n"
                 "Before starting the server."
             )
-        tts_url = f"https://{azure_region}.tts.speech.microsoft.com/cognitiveservices/v1"
-        tts_headers = {
-            "Ocp-Apim-Subscription-Key": azure_key,
-            "Content-Type": "application/ssml+xml",
-            "X-Microsoft-OutputFormat": "audio-24khz-160kbitrate-mono-mp3",
-        }
-
     report("notes", 12, "Extracting slide notes")
     extracted_notes = notes_override if notes_override is not None else extract_slide_notes(str(ppt_path_obj))
     slide_notes = [(item["slide"], item["text"]) for item in extracted_notes]
@@ -450,14 +476,14 @@ def run_pipeline(
                 pipeline_settings["elevenlabs_model"],
             )
         else:
-            ssml = f"""
-<speak version='1.0' xml:lang='en-US'>
-  <voice name='{pipeline_settings['voice']}'><prosody rate='{pipeline_settings['speaking_rate']}'>{text}</prosody></voice>
-</speak>
-"""
-            r = requests.post(tts_url, headers=tts_headers, data=ssml.encode("utf-8"))
-            r.raise_for_status()
-            out_mp3.write_bytes(r.content)
+            synthesize_azure_tts(
+                text,
+                out_mp3,
+                pipeline_settings["voice"],
+                azure_key,
+                azure_region,
+                pipeline_settings["speaking_rate"],
+            )
 
         audio_files.append(out_mp3)
         audio_durations[i] = probe_duration_seconds(out_mp3)

@@ -23,6 +23,7 @@
   </div>
   <div class="nav-links">
     <a href="/">Dashboard</a>
+    <a href="/redub">Redub Video</a>
     <a href="/history" class="active">Job History</a>
   </div>
 </nav>
@@ -41,6 +42,7 @@
       <thead>
         <tr>
           <th>Job ID</th>
+          <th>Kind</th>
           <th>Status</th>
           <th>File</th>
           <th>Updated</th>
@@ -53,6 +55,7 @@
           {% for job in jobs %}
           <tr>
             <td class="mono">{{ job.job_id[:12] }}…</td>
+            <td><span class="status-badge {{ 'completed' if job.kind == 'redub' else 'processing' }}">{{ 'Redub' if job.kind == 'redub' else 'PPTX' }}</span></td>
             <td>
               {% set s = job.status | lower %}
               <span class="status-badge {{ s }}">{{ job.status }}</span>
@@ -77,7 +80,7 @@
           {% endfor %}
         {% else %}
           <tr>
-            <td colspan="6" style="text-align:center;color:var(--text-dim);padding:32px;">No jobs yet. Go to the <a href="/">Dashboard</a> to create one.</td>
+            <td colspan="7" style="text-align:center;color:var(--text-dim);padding:32px;">No jobs yet. Go to the <a href="/">Dashboard</a> to create one.</td>
           </tr>
         {% endif %}
       </tbody>

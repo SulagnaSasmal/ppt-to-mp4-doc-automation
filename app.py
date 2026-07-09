@@ -23,10 +23,12 @@ from ppt_pipeline import (
     generate_voice_previews,
     list_elevenlabs_voices,
     normalize_pipeline_settings,
+    probe_duration_seconds,
     rewrite_notes_with_claude,
     run_pipeline,
     save_designed_voice,
 )
+from video_pipeline import resolve_cuts, run_video_pipeline
 
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
@@ -255,6 +257,53 @@ def run_conversion_async(
         pythoncom.CoUninitialize()
 
 
+def run_video_conversion_async(
+    job_id: str,
+    video_path: str,
+    job_dir: str,
+    script_text: str,
+    cut_instruction: str,
+    settings: Dict[str, Any],
+) -> None:
+    try:
+        def on_progress(stage: str, progress: int, message: str) -> None:
+            update_job(job_id, stage=stage, progress=progress, message=message)
+
+        result = run_video_pipeline(
+            video_path,
+            script_text,
+            cut_instruction,
+            job_dir,
+            settings=settings,
+            progress_cb=on_progress,
+        )
+
+        output_video = result["final_video"]
+        telemetry = result.get("telemetry", {})
+
+        logger.info("[%s] Redub completed successfully", job_id)
+        update_job(
+            job_id,
+            status="completed",
+            progress=100,
+            message="Video ready for download",
+            output=output_video,
+            final_video_path=str(Path(job_dir) / "final.mp4"),
+            telemetry=telemetry,
+            cuts=result.get("cuts", []),
+            mux_info=result.get("mux_info", {}),
+        )
+    except Exception as exc:
+        logger.exception("[%s] Redub failed", job_id)
+        update_job(
+            job_id,
+            status="error",
+            progress=100,
+            message=f"Redub failed: {exc}",
+            output=None,
+        )
+
+
 @app.get("/", response_class=HTMLResponse)
 def upload_page(request: Request):
     return templates.TemplateResponse(
@@ -345,6 +394,7 @@ async def convert_ppt(
 
     jobs[job_id] = {
         "job_id": job_id,
+        "kind": "pptx",
         "status": "processing",
         "stage": "upload",
         "progress": 5,
@@ -398,6 +448,113 @@ async def convert_ppt_ui(
         ppt, voice, speaking_rate, resolution, fps, quality, tts_provider, elevenlabs_voice_id, notes_json
     )
     return JSONResponse(result)
+
+
+@app.get("/redub", response_class=HTMLResponse)
+def redub_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "redub.html",
+        {
+            "default_settings": DEFAULT_PIPELINE_SETTINGS,
+        },
+    )
+
+
+@app.post("/redub/preview")
+async def redub_preview(
+    video: UploadFile = File(...),
+    cut_instruction: str = Form(""),
+):
+    preview_id = str(uuid4())
+    preview_path = UPLOAD_DIR / f"redub_preview_{preview_id}_{video.filename}"
+    with preview_path.open("wb") as file_obj:
+        shutil.copyfileobj(video.file, file_obj)
+
+    preview_dir = UPLOAD_DIR / f"redub_preview_{preview_id}_work"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        total_duration = probe_duration_seconds(preview_path)
+        cut_ranges, _transcript = resolve_cuts(preview_path, cut_instruction, preview_dir)
+        cut_seconds = sum(e - s for s, e in cut_ranges)
+        return {
+            "total_duration": round(total_duration, 2),
+            "cuts": [{"start": round(s, 2), "end": round(e, 2)} for s, e in cut_ranges],
+            "estimated_kept_duration": round(max(0.0, total_duration - cut_seconds), 2),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Cut preview failed: {exc}") from exc
+    finally:
+        try:
+            preview_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        shutil.rmtree(preview_dir, ignore_errors=True)
+
+
+@app.post("/redub/convert")
+async def redub_convert(
+    video: UploadFile = File(...),
+    script_text: str = Form(...),
+    cut_instruction: str = Form(""),
+    voice: str = Form(DEFAULT_PIPELINE_SETTINGS["voice"]),
+    speaking_rate: str = Form(DEFAULT_PIPELINE_SETTINGS["speaking_rate"]),
+    tts_provider: str = Form(DEFAULT_PIPELINE_SETTINGS["tts_provider"]),
+    elevenlabs_voice_id: str = Form(DEFAULT_PIPELINE_SETTINGS["elevenlabs_voice_id"]),
+):
+    logger.info("Received redub video upload: %s", video.filename)
+
+    settings = normalize_pipeline_settings(
+        {
+            "voice": voice,
+            "speaking_rate": speaking_rate,
+            "tts_provider": tts_provider,
+            "elevenlabs_voice_id": elevenlabs_voice_id,
+        }
+    )
+    job_id = str(uuid4())
+    job_dir = JOBS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    jobs[job_id] = {
+        "job_id": job_id,
+        "kind": "redub",
+        "status": "processing",
+        "stage": "upload",
+        "progress": 5,
+        "message": "Saving video",
+        "output": None,
+        "filename": video.filename,
+        "settings": settings,
+        "telemetry": {},
+        "created_at": utc_now_iso(),
+        "updated_at": utc_now_iso(),
+        "log": str(job_dir / "status.log"),
+    }
+    persist_status(job_id)
+    append_log(job_id, "Job created")
+
+    video_path = UPLOAD_DIR / f"{job_id}_{video.filename}"
+    with video_path.open("wb") as file_obj:
+        shutil.copyfileobj(video.file, file_obj)
+    append_log(job_id, f"Saved video: {video.filename}")
+
+    thread = Thread(
+        target=run_video_conversion_async,
+        args=(job_id, str(video_path), str(job_dir), script_text, cut_instruction, settings),
+    )
+    thread.daemon = True
+    thread.start()
+
+    logger.info("[%s] Background redub started for: %s", job_id, video.filename)
+    return {
+        "job_id": job_id,
+        "status_url": f"/status/{job_id}",
+        "download_url": f"/download/{job_id}",
+        "logs_url": f"/logs/{job_id}",
+        "history_url": "/history",
+    }
 
 
 @app.get("/voices")

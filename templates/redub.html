@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PPT2Video — Redub Video</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css?v=20260220b" />
+</head>
+
+<body>
+
+<!-- ── Top Navigation Bar ── -->
+<nav class="top-nav">
+  <div style="display:flex;align-items:center;">
+    <div class="logo">
+      <span class="logo-icon">▶</span>
+      PPT2Video
+    </div>
+    <span class="project-name">AI Presentation Converter</span>
+  </div>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/redub" class="active">Redub Video</a>
+    <a href="/history">Job History</a>
+  </div>
+</nav>
+
+<!-- ── Main Content ── -->
+<main class="main-content">
+<div class="card">
+
+  <!-- Card Header -->
+  <div class="card-header">
+    <h1 class="card-title">Redub a Video</h1>
+    <p class="card-subtitle">Upload an MP4 that already has its own narration. We'll cut it per your instructions and replace the audio entirely with a new AI voice reading your script.</p>
+  </div>
+
+  <form id="redubForm" enctype="multipart/form-data">
+
+    <!-- ── Upload Zone ── -->
+    <div class="upload-zone" id="upload-drop-zone">
+      <div class="cloud-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 16V8m0 0l-3 3m3-3l3 3"/><path d="M20 16.7A4.5 4.5 0 0 0 17.5 8h-1.09A7 7 0 1 0 4 14.34"/></svg>
+      </div>
+      <div class="upload-text">Drop your MP4 here or <strong>browse</strong></div>
+      <div class="upload-hint">MP4 only &middot; original audio will be replaced</div>
+      <input id="video-file-input" type="file" name="video" accept=".mp4,video/mp4" required />
+      <div id="selected-file" class="selected-file hidden"></div>
+    </div>
+
+    <!-- ── Script + Cut Instruction ── -->
+    <div class="control-grid" style="grid-template-columns: 1fr;">
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Narration Script (full replacement text)
+        </label>
+        <textarea id="script-text" rows="8" placeholder="Paste the full narration script to read over the video. The original video's own audio is discarded entirely."></textarea>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+          Cut Instructions (optional)
+        </label>
+        <textarea id="cut-instruction" rows="3" placeholder='e.g. "cut 0:45-1:10" for exact timestamps, or "remove the awkward pause after the intro" for AI judgment (needs a transcript).'></textarea>
+      </div>
+    </div>
+
+    <!-- ── Control Grid ── -->
+    <div class="control-grid">
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          TTS Provider
+        </label>
+        <select id="tts-provider">
+          <option value="elevenlabs" {{ 'selected' if default_settings.tts_provider == 'elevenlabs' }}>ElevenLabs (recommended)</option>
+          <option value="azure" {{ 'selected' if default_settings.tts_provider == 'azure' }}>Azure (Jenny Neural)</option>
+        </select>
+      </div>
+
+      <div class="control-group" id="azure-voice-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          Azure Voice
+        </label>
+        <input id="voice" type="text" value="{{ default_settings.voice }}" placeholder="e.g. en-US-JennyNeural" />
+      </div>
+
+      <div class="control-group" id="elevenlabs-voice-group">
+        <label>
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          ElevenLabs Voice
+        </label>
+        <select id="elevenlabs-voice-id">
+          <option value="{{ default_settings.elevenlabs_voice_id }}">Loading voices…</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Speaking Rate
+        </label>
+        <div class="range-row">
+          <input id="speaking-rate-range" type="range" min="-50" max="50" value="0" />
+          <span id="rate-value" class="range-value">0%</span>
+        </div>
+        <input id="speaking-rate" type="hidden" value="{{ default_settings.speaking_rate }}" />
+      </div>
+    </div>
+
+    <!-- ── Action Row ── -->
+    <div class="action-row">
+      <button id="reset-btn" type="button" class="btn btn-ghost" onclick="resetTask()">
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Reset
+      </button>
+      <button id="preview-btn" type="button" class="btn btn-secondary">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Preview Cuts
+      </button>
+      <button id="convert-btn" type="submit" class="btn btn-primary">
+        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Generate Video
+      </button>
+    </div>
+  </form>
+
+  <!-- ── Preview Panel (collapsible) ── -->
+  <details id="preview-panel" class="preview-panel hidden">
+    <summary>
+      <svg class="chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      Preview Before Convert
+    </summary>
+    <div class="preview-body">
+      <div id="preview-meta" class="preview-meta"></div>
+      <div id="preview-notes" class="preview-notes"></div>
+    </div>
+  </details>
+
+  <!-- ── Progress Stepper ── -->
+  <div id="stepper-section" class="hidden">
+    <div class="progress-stepper">
+      <div class="step" id="step-upload">
+        <span class="step-dot">1</span>
+        <span>Upload</span>
+      </div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step" id="step-process">
+        <span class="step-dot">2</span>
+        <span>Cuts + Narration</span>
+      </div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step" id="step-render">
+        <span class="step-dot">3</span>
+        <span>Muxing</span>
+      </div>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+
+    <div id="status-text" class="status-text">Waiting for upload…</div>
+
+    <div id="telemetry-bar" class="telemetry-bar"></div>
+  </div>
+
+  <!-- ── Success Toast ── -->
+  <div id="success-toast" class="success-toast">
+    <div class="toast-icon">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="toast-body">
+      <div class="toast-title">Video Ready!</div>
+      <div class="toast-sub" id="toast-telemetry"></div>
+    </div>
+    <div class="toast-actions">
+      <button id="download-video" class="btn btn-success" disabled>
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download MP4
+      </button>
+      <button id="download-log" class="btn btn-icon" title="Download Log" disabled>
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Error Toast ── -->
+  <div id="error-toast" class="error-toast">
+    <div class="toast-icon">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    </div>
+    <div class="toast-body">
+      <div class="toast-title">Redub Failed</div>
+      <div class="toast-sub" id="error-detail">Check the logs for details.</div>
+    </div>
+  </div>
+
+  <!-- ── Collapsible Live Logs ── -->
+  <details class="logs-accordion">
+    <summary>
+      <svg class="chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      <svg class="log-icon" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      Live Logs
+    </summary>
+    <div class="logs-body">
+      <pre id="live-logs" class="live-logs">No logs yet.</pre>
+    </div>
+  </details>
+
+</div>
+</main>
+
+<!-- ════════════════════════════════════════════════════════════
+     JavaScript
+     ════════════════════════════════════════════════════════════ -->
+<script>
+/* --- State --- */
+let jobId        = null;
+let pollInterval = null;
+let logInterval  = null;
+
+/* --- DOM refs --- */
+const redubForm       = document.getElementById("redubForm");
+const fileInput       = document.getElementById("video-file-input");
+const uploadDropZone  = document.getElementById("upload-drop-zone");
+const selectedFileEl  = document.getElementById("selected-file");
+const liveLogs        = document.getElementById("live-logs");
+const previewBtn      = document.getElementById("preview-btn");
+const previewPanel    = document.getElementById("preview-panel");
+const previewMeta     = document.getElementById("preview-meta");
+const previewNotes    = document.getElementById("preview-notes");
+const stepperSection  = document.getElementById("stepper-section");
+const successToast    = document.getElementById("success-toast");
+const errorToast      = document.getElementById("error-toast");
+const rateRange       = document.getElementById("speaking-rate-range");
+const rateValue       = document.getElementById("rate-value");
+const rateHidden      = document.getElementById("speaking-rate");
+const ttsProviderSel  = document.getElementById("tts-provider");
+const azureVoiceGroup = document.getElementById("azure-voice-group");
+const elVoiceGroup    = document.getElementById("elevenlabs-voice-group");
+const elVoiceIdInput  = document.getElementById("elevenlabs-voice-id");
+const scriptTextEl    = document.getElementById("script-text");
+const cutInstructionEl = document.getElementById("cut-instruction");
+
+/* --- Range slider sync --- */
+function syncRate() {
+  const v = rateRange.value;
+  const prefix = v > 0 ? "+" : "";
+  rateValue.textContent = prefix + v + "%";
+  rateHidden.value = prefix + v + "%";
+}
+rateRange.addEventListener("input", syncRate);
+(function initRange() {
+  const raw = rateHidden.value.replace("%","").replace("+","");
+  const num = parseInt(raw, 10) || 0;
+  rateRange.value = num;
+  syncRate();
+})();
+
+/* --- TTS provider toggle --- */
+function syncProviderVisibility() {
+  const isEleven = ttsProviderSel.value === "elevenlabs";
+  elVoiceGroup.style.display = isEleven ? "" : "none";
+  azureVoiceGroup.style.display = isEleven ? "none" : "";
+}
+ttsProviderSel.addEventListener("change", syncProviderVisibility);
+syncProviderVisibility();
+
+/* --- Load ElevenLabs voices into the dropdown (no TTS quota used) --- */
+const DEFAULT_ELEVENLABS_VOICE_ID = "{{ default_settings.elevenlabs_voice_id }}";
+
+async function loadElevenLabsVoices() {
+  try {
+    const res = await fetch("/voices");
+    const data = await res.json();
+    if (!res.ok) {
+      elVoiceIdInput.innerHTML = `<option value="${DEFAULT_ELEVENLABS_VOICE_ID}">Could not load voices - using default</option>`;
+      return;
+    }
+    const voices = data.voices || [];
+    elVoiceIdInput.innerHTML = voices.map(v => {
+      const label = v.description ? `${v.name} - ${v.description}` : v.name;
+      return `<option value="${v.voice_id}">${label}</option>`;
+    }).join("");
+    if (voices.some(v => v.voice_id === DEFAULT_ELEVENLABS_VOICE_ID)) {
+      elVoiceIdInput.value = DEFAULT_ELEVENLABS_VOICE_ID;
+    }
+  } catch (_) {
+    elVoiceIdInput.innerHTML = `<option value="${DEFAULT_ELEVENLABS_VOICE_ID}">Could not load voices - using default</option>`;
+  }
+}
+loadElevenLabsVoices();
+
+/* --- Helpers --- */
+function readSettings() {
+  return {
+    voice:        document.getElementById("voice").value,
+    speaking_rate: rateHidden.value,
+    tts_provider:  ttsProviderSel.value,
+    elevenlabs_voice_id: elVoiceIdInput.value
+  };
+}
+
+function buildFormData() {
+  const fd = new FormData();
+  if (fileInput.files[0]) fd.append("video", fileInput.files[0]);
+  fd.append("script_text", scriptTextEl.value);
+  fd.append("cut_instruction", cutInstructionEl.value);
+  const s = readSettings();
+  Object.keys(s).forEach(k => fd.append(k, s[k]));
+  return fd;
+}
+
+function showSelectedFile(file) {
+  if (!file) {
+    selectedFileEl.classList.add("hidden");
+    selectedFileEl.textContent = "";
+    return;
+  }
+  const sizeMB = (file.size / 1048576).toFixed(1);
+  selectedFileEl.textContent = `✓ ${file.name} (${sizeMB} MB)`;
+  selectedFileEl.classList.remove("hidden");
+}
+
+/* --- Drag & Drop --- */
+["dragenter","dragover"].forEach(e =>
+  uploadDropZone.addEventListener(e, ev => { ev.preventDefault(); uploadDropZone.classList.add("drag-active"); })
+);
+["dragleave","drop"].forEach(e =>
+  uploadDropZone.addEventListener(e, ev => { ev.preventDefault(); uploadDropZone.classList.remove("drag-active"); })
+);
+uploadDropZone.addEventListener("drop", ev => {
+  const files = ev.dataTransfer?.files;
+  if (!files || !files.length) return;
+  fileInput.files = files;
+  showSelectedFile(files[0]);
+});
+fileInput.addEventListener("change", () => showSelectedFile(fileInput.files?.[0]));
+
+/* --- Preview cuts --- */
+function renderPreview(data) {
+  previewPanel.classList.remove("hidden");
+  previewPanel.open = true;
+
+  previewMeta.innerHTML = [
+    `<span class="meta-chip">Source: ${data.total_duration}s</span>`,
+    `<span class="meta-chip">Cut ranges: ${data.cuts.length}</span>`,
+    `<span class="meta-chip">Estimated kept: ${data.estimated_kept_duration}s</span>`
+  ].join("");
+
+  previewNotes.innerHTML = data.cuts.length
+    ? data.cuts.map(c => `<div class="note-item"><div class="note-head">Cut</div><div class="note-text">${c.start}s → ${c.end}s</div></div>`).join("")
+    : '<div class="note-item">No cuts resolved from the instruction (or no instruction given) - the full video will be kept.</div>';
+}
+
+previewBtn.addEventListener("click", async () => {
+  const file = fileInput.files[0];
+  if (!file) { alert("Please select an MP4 file first."); return; }
+  previewBtn.disabled = true;
+  previewBtn.textContent = "Resolving…";
+  try {
+    const fd = new FormData();
+    fd.append("video", file);
+    fd.append("cut_instruction", cutInstructionEl.value);
+    const res = await fetch("/redub/preview", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) { alert(data.detail || "Preview failed"); return; }
+    renderPreview(data);
+  } finally {
+    previewBtn.disabled = false;
+    previewBtn.textContent = "Preview Cuts";
+  }
+});
+
+/* --- Stepper --- */
+function setStepper(stage, pct) {
+  const ids    = ["step-upload","step-process","step-render"];
+  const lines  = ["line-1","line-2"];
+
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove("active","done");
+    if (i + 1 < stage) el.classList.add("done");
+    else if (i + 1 === stage) el.classList.add("active");
+  });
+
+  lines.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove("active","done");
+    if (i + 1 < stage) el.classList.add("done");
+    else if (i + 1 === stage) el.classList.add("active");
+  });
+
+  document.getElementById("progress-bar").style.width = pct + "%";
+}
+
+/* --- Telemetry --- */
+function setTelemetry(t) {
+  const bar = document.getElementById("telemetry-bar");
+  if (!bar) return;
+  if (!t || !t.total_seconds) { bar.innerHTML = ""; return; }
+  bar.innerHTML = [
+    `<span class="t-item"><span class="t-label">Cuts:</span><span class="t-value">${t.cuts_seconds ?? '–'}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Editing:</span><span class="t-value">${t.edit_seconds ?? '–'}s</span></span>`,
+    `<span class="t-item"><span class="t-label">TTS:</span><span class="t-value">${t.tts_seconds ?? '–'}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Mux:</span><span class="t-value">${t.mux_seconds ?? '–'}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Total:</span><span class="t-value">${t.total_seconds}s</span></span>`
+  ].join("");
+
+  const toastSub = document.getElementById("toast-telemetry");
+  if (toastSub) toastSub.textContent = `Total: ${t.total_seconds}s`;
+}
+
+/* --- Submit / Convert --- */
+redubForm.addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) { alert("Please select an MP4 file."); return; }
+  if (!scriptTextEl.value.trim()) { alert("Please enter a narration script."); return; }
+
+  stepperSection.classList.remove("hidden");
+  successToast.classList.remove("visible");
+  errorToast.classList.remove("visible");
+  setStepper(1, 5);
+  document.getElementById("status-text").textContent = "Uploading…";
+
+  const fd = buildFormData();
+  const res = await fetch("/redub/convert", { method: "POST", body: fd });
+  const data = await res.json();
+  if (!res.ok) { alert(data.detail || "Could not start redub"); return; }
+
+  jobId = data.job_id;
+  if (liveLogs) liveLogs.textContent = "Job started…\n";
+
+  setStepper(2, 15);
+  document.getElementById("status-text").textContent = "Processing…";
+
+  startPolling(jobId);
+  startLogPolling(jobId);
+});
+
+/* --- Polling --- */
+function startPolling(jid) {
+  pollInterval = setInterval(async () => {
+    const res = await fetch(`/status/${jid}`);
+    const d   = await res.json();
+    updateStatus(d);
+
+    if (d.status === "completed") {
+      clearInterval(pollInterval);
+      onSuccess(d);
+    }
+    if (d.status === "error") {
+      clearInterval(pollInterval);
+      onError(d);
+    }
+  }, 1500);
+}
+
+function updateStatus(d) {
+  const lbl = document.getElementById("status-text");
+  const pct = d.progress || 0;
+
+  if (pct < 55) {
+    setStepper(2, pct);
+    if (lbl) lbl.textContent = `${d.message || 'Processing…'} ${pct}%`;
+  } else {
+    setStepper(3, pct);
+    if (lbl) lbl.textContent = `${d.message || 'Rendering…'} ${pct}%`;
+  }
+
+  setTelemetry(d.telemetry);
+}
+
+function onSuccess(d) {
+  setStepper(4, 100);
+  document.getElementById("status-text").textContent = "Complete ✓";
+  setTelemetry(d.telemetry);
+
+  successToast.classList.add("visible");
+  errorToast.classList.remove("visible");
+
+  const dlBtn = document.getElementById("download-video");
+  dlBtn.disabled = false;
+  dlBtn.onclick = () => window.location.href = `/download/${jobId}`;
+
+  const logBtn = document.getElementById("download-log");
+  logBtn.disabled = false;
+  logBtn.onclick = () => window.location.href = `/logs/${jobId}?download=true`;
+
+  refreshLogs(jobId);
+  stopLogPolling();
+}
+
+function onError(d) {
+  setStepper(0, 0);
+  document.getElementById("status-text").textContent = "Failed";
+  document.getElementById("error-detail").textContent = d.message || "Check the logs for details.";
+  errorToast.classList.add("visible");
+  successToast.classList.remove("visible");
+
+  const logBtn = document.getElementById("download-log");
+  if (logBtn && jobId) {
+    logBtn.disabled = false;
+    logBtn.onclick = () => window.location.href = `/logs/${jobId}?download=true`;
+  }
+
+  refreshLogs(jobId);
+  stopLogPolling();
+}
+
+/* --- Log polling --- */
+function stopLogPolling() {
+  if (logInterval) { clearInterval(logInterval); logInterval = null; }
+}
+
+async function refreshLogs(jid) {
+  if (!jid || !liveLogs) return;
+  try {
+    const res = await fetch(`/logs/${jid}`);
+    if (!res.ok) return;
+    const txt = await res.text();
+    liveLogs.textContent = txt?.trim() ? txt : "No logs yet.";
+    liveLogs.scrollTop = liveLogs.scrollHeight;
+  } catch (_) {}
+}
+
+function startLogPolling(jid) {
+  stopLogPolling();
+  refreshLogs(jid);
+  logInterval = setInterval(() => refreshLogs(jid), 1500);
+}
+
+/* --- Reset --- */
+function resetTask() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  stopLogPolling();
+  jobId = null;
+
+  stepperSection.classList.add("hidden");
+  successToast.classList.remove("visible");
+  errorToast.classList.remove("visible");
+
+  setStepper(0, 0);
+  document.getElementById("status-text").textContent = "Waiting for upload…";
+  setTelemetry(null);
+
+  const dl = document.getElementById("download-video");
+  if (dl) { dl.disabled = true; dl.onclick = null; }
+  const dlLog = document.getElementById("download-log");
+  if (dlLog) { dlLog.disabled = true; dlLog.onclick = null; }
+
+  if (liveLogs) liveLogs.textContent = "No logs yet.";
+  previewPanel.classList.add("hidden");
+  previewPanel.open = false;
+  previewMeta.innerHTML = "";
+  previewNotes.innerHTML = "";
+
+  redubForm.reset();
+  showSelectedFile(null);
+  syncRate();
+  syncProviderVisibility();
+}
+</script>
+
+</body>
+</html>
