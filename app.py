@@ -28,7 +28,7 @@ from ppt_pipeline import (
     run_pipeline,
     save_designed_voice,
 )
-from video_pipeline import resolve_cuts, run_video_pipeline
+from video_pipeline import resolve_plan, run_video_pipeline
 
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
@@ -261,8 +261,8 @@ def run_video_conversion_async(
     job_id: str,
     video_path: str,
     job_dir: str,
-    script_text: str,
-    cut_instruction: str,
+    instruction: str,
+    segments_override: Optional[List[Dict[str, Any]]],
     settings: Dict[str, Any],
 ) -> None:
     try:
@@ -271,11 +271,11 @@ def run_video_conversion_async(
 
         result = run_video_pipeline(
             video_path,
-            script_text,
-            cut_instruction,
+            instruction,
             job_dir,
             settings=settings,
             progress_cb=on_progress,
+            segments_override=segments_override,
         )
 
         output_video = result["final_video"]
@@ -290,8 +290,7 @@ def run_video_conversion_async(
             output=output_video,
             final_video_path=str(Path(job_dir) / "final.mp4"),
             telemetry=telemetry,
-            cuts=result.get("cuts", []),
-            mux_info=result.get("mux_info", {}),
+            segments=result.get("segments", []),
         )
     except Exception as exc:
         logger.exception("[%s] Redub failed", job_id)
@@ -464,7 +463,7 @@ def redub_page(request: Request):
 @app.post("/redub/preview")
 async def redub_preview(
     video: UploadFile = File(...),
-    cut_instruction: str = Form(""),
+    instruction: str = Form(""),
 ):
     preview_id = str(uuid4())
     preview_path = UPLOAD_DIR / f"redub_preview_{preview_id}_{video.filename}"
@@ -476,15 +475,15 @@ async def redub_preview(
 
     try:
         total_duration = probe_duration_seconds(preview_path)
-        cut_ranges, _transcript = resolve_cuts(preview_path, cut_instruction, preview_dir)
-        cut_seconds = sum(e - s for s, e in cut_ranges)
+        segments = resolve_plan(preview_path, instruction, preview_dir)
+        kept_seconds = sum(s["end"] - s["start"] for s in segments if s["keep"])
         return {
             "total_duration": round(total_duration, 2),
-            "cuts": [{"start": round(s, 2), "end": round(e, 2)} for s, e in cut_ranges],
-            "estimated_kept_duration": round(max(0.0, total_duration - cut_seconds), 2),
+            "segments": segments,
+            "estimated_kept_duration": round(kept_seconds, 2),
         }
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Cut preview failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Plan preview failed: {exc}") from exc
     finally:
         try:
             preview_path.unlink(missing_ok=True)
@@ -496,12 +495,12 @@ async def redub_preview(
 @app.post("/redub/convert")
 async def redub_convert(
     video: UploadFile = File(...),
-    script_text: str = Form(...),
-    cut_instruction: str = Form(""),
+    instruction: str = Form(""),
     voice: str = Form(DEFAULT_PIPELINE_SETTINGS["voice"]),
     speaking_rate: str = Form(DEFAULT_PIPELINE_SETTINGS["speaking_rate"]),
     tts_provider: str = Form(DEFAULT_PIPELINE_SETTINGS["tts_provider"]),
     elevenlabs_voice_id: str = Form(DEFAULT_PIPELINE_SETTINGS["elevenlabs_voice_id"]),
+    segments_json: Optional[str] = Form(None),
 ):
     logger.info("Received redub video upload: %s", video.filename)
 
@@ -513,6 +512,7 @@ async def redub_convert(
             "elevenlabs_voice_id": elevenlabs_voice_id,
         }
     )
+    segments_override = json.loads(segments_json) if segments_json else None
     job_id = str(uuid4())
     job_dir = JOBS_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -542,7 +542,7 @@ async def redub_convert(
 
     thread = Thread(
         target=run_video_conversion_async,
-        args=(job_id, str(video_path), str(job_dir), script_text, cut_instruction, settings),
+        args=(job_id, str(video_path), str(job_dir), instruction, segments_override, settings),
     )
     thread.daemon = True
     thread.start()

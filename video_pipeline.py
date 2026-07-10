@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -24,75 +25,13 @@ AZURE_STT_API_VERSION = "2024-11-15"
 MAX_TTS_CHUNK_CHARS = 1500
 ATEMPO_MIN = 0.85
 ATEMPO_MAX = 1.15
-MIN_KEEP_SEGMENT_SECONDS = 0.05
-
-_TIME_RE = r"(?:\d{1,2}:)?\d{1,2}:\d{2}"
-_CUT_PATTERN = re.compile(
-    rf"\b(?:cut|remove|delete|trim)\b[^0-9]*({_TIME_RE})\s*(?:-|to|through|until|–|—)\s*({_TIME_RE})",
-    re.IGNORECASE,
-)
-
-
-def _parse_timestamp(ts: str) -> float:
-    parts = [int(p) for p in ts.split(":")]
-    if len(parts) == 2:
-        minutes, seconds = parts
-        return minutes * 60 + seconds
-    hours, minutes, seconds = parts
-    return hours * 3600 + minutes * 60 + seconds
-
-
-def parse_explicit_cuts(instruction: str) -> List[Tuple[float, float]]:
-    """Pull explicit 'cut/remove/trim X-Y' timestamp ranges out of a free-text instruction."""
-    cuts = []
-    for match in _CUT_PATTERN.finditer(instruction):
-        start = _parse_timestamp(match.group(1))
-        end = _parse_timestamp(match.group(2))
-        if end > start:
-            cuts.append((start, end))
-    return sorted(cuts)
-
-
-def _has_vague_leftover(instruction: str) -> bool:
-    """Heuristic: is there instruction text left over once explicit cut phrases are stripped?"""
-    stripped = _CUT_PATTERN.sub("", instruction)
-    stripped = re.sub(r"\b(cut|remove|delete|trim|and|also|the)\b", "", stripped, flags=re.IGNORECASE)
-    stripped = re.sub(r"[,.\s]+", " ", stripped).strip()
-    return len(stripped) > 15
-
-
-def _merge_ranges(ranges: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
-    if not ranges:
-        return []
-    ranges = sorted(ranges)
-    merged = [ranges[0]]
-    for start, end in ranges[1:]:
-        last_start, last_end = merged[-1]
-        if start <= last_end:
-            merged[-1] = (last_start, max(last_end, end))
-        else:
-            merged.append((start, end))
-    return merged
-
-
-def _keep_segments(cuts: List[Tuple[float, float]], total_duration: float) -> List[Tuple[float, float]]:
-    merged_cuts = _merge_ranges([(max(0.0, s), min(total_duration, e)) for s, e in cuts])
-    keep = []
-    cursor = 0.0
-    for start, end in merged_cuts:
-        if start > cursor:
-            keep.append((cursor, start))
-        cursor = max(cursor, end)
-    if cursor < total_duration:
-        keep.append((cursor, total_duration))
-    return [(s, e) for s, e in keep if e - s > MIN_KEEP_SEGMENT_SECONDS]
+MIN_SEGMENT_SECONDS = 0.05
 
 
 def transcribe_azure(video_path: Path, api_key: str, region: str, out_dir: Path) -> List[Dict[str, Any]]:
     """
     Extract the video's audio and transcribe it via Azure's Fast Transcription REST API.
-    Returns a list of {text, start, end} phrase segments (seconds). Only needed when a cut
-    instruction has non-timestamp ("vague") content that requires AI judgment.
+    Returns a list of {text, start, end} phrase segments (seconds).
     """
     audio_path = out_dir / "source_audio.wav"
     ffmpeg_exe = resolve_media_tool("ffmpeg")
@@ -135,123 +74,91 @@ def transcribe_azure(video_path: Path, api_key: str, region: str, out_dir: Path)
     return segments
 
 
-def ai_judgment_cuts(
+def _validate_segments(segments: List[Dict[str, Any]], total_duration: float) -> List[Dict[str, Any]]:
+    """Clamp/drop malformed AI-planned segments so downstream ffmpeg calls never see garbage timing."""
+    cleaned = []
+    for seg in segments:
+        try:
+            start = max(0.0, min(float(seg["start"]), total_duration))
+            end = max(0.0, min(float(seg["end"]), total_duration))
+            keep = bool(seg.get("keep", False))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if end - start <= MIN_SEGMENT_SECONDS:
+            continue
+
+        entry: Dict[str, Any] = {"start": start, "end": end, "keep": keep}
+        if keep:
+            narration = str(seg.get("narration") or "").strip()
+            if not narration:
+                continue
+            entry["narration"] = narration
+        cleaned.append(entry)
+
+    cleaned.sort(key=lambda s: s["start"])
+    if not any(s["keep"] for s in cleaned):
+        raise ValueError("AI segment plan produced no usable kept segments.")
+    return cleaned
+
+
+def plan_segments(
     transcript: List[Dict[str, Any]],
     instruction: str,
+    total_duration: float,
     api_key: str,
     model: str = ANTHROPIC_MODEL,
-) -> List[Tuple[float, float]]:
-    """Ask Claude to pick cut ranges grounded in a timestamped transcript."""
-    if not transcript:
-        return []
+) -> List[Dict[str, Any]]:
+    """
+    Partition the video's timeline into keep/cut segments, writing narration text for each
+    kept segment - grounded in the original transcript, shaped by the free-text instruction.
+
+    If instruction is empty, skip the AI call entirely: return one segment spanning the whole
+    video, narration = the original transcript's own text (a plain redub-in-new-voice pass).
+    """
+    if not instruction or not instruction.strip():
+        full_text = " ".join(seg["text"].strip() for seg in transcript if seg.get("text", "").strip())
+        return [{"start": 0.0, "end": total_duration, "keep": True, "narration": full_text or " "}]
 
     transcript_payload = [
         {"start": round(seg["start"], 2), "end": round(seg["end"], 2), "text": seg["text"]}
         for seg in transcript
     ]
     prompt = (
-        "You are editing a video transcript to decide what to CUT (remove) from the final video.\n"
+        "You are editing a narrated video. You're given its original timestamped transcript and "
+        "an instruction describing what to change. Decide how to partition the video's full "
+        f"timeline (0 to {total_duration:.2f} seconds) into an ordered list of segments.\n\n"
         f'Instruction: "{instruction}"\n\n'
-        "Timestamped transcript (JSON array of objects with start, end in seconds, and text):\n"
+        "Original timestamped transcript (JSON array of objects with start, end in seconds, and text):\n"
         f"{json.dumps(transcript_payload, ensure_ascii=False)}\n\n"
-        "Return ONLY a JSON array of objects with start and end (seconds, numbers) marking ranges "
-        "to CUT. Ground start/end strictly in the transcript's own timestamps - never invent times "
-        "outside the transcript's range. If nothing should be cut, return an empty array []. "
+        "Return ONLY a JSON array of segment objects covering the entire timeline from 0 to "
+        f"{total_duration:.2f} with no gaps and no overlaps, in order. Each object has:\n"
+        '  "start" and "end" (seconds, numbers, grounded in the transcript\'s own timestamps),\n'
+        '  "keep" (boolean - false means this span is cut entirely from the final video),\n'
+        '  "narration" (required when keep is true - the text to be spoken by an AI voice for this '
+        "span. By default, reuse the original transcript's own words for that span, lightly cleaned "
+        "up (remove filler words like um/uh, false starts) - only substantially rewrite where the "
+        "instruction specifically asks for it.)\n"
         "No commentary, no code fences - raw JSON array only."
     )
-    raw_text = strip_code_fences(call_claude(prompt, api_key, model))
-    cuts = [(float(c["start"]), float(c["end"])) for c in json.loads(raw_text)]
-    return sorted(c for c in cuts if c[1] > c[0])
+    raw_text = strip_code_fences(call_claude(prompt, api_key, model, max_tokens=8192))
+    return _validate_segments(json.loads(raw_text), total_duration)
 
 
-def resolve_cuts(
-    video_path: Path,
-    cut_instruction: str,
-    out_dir: Path,
-) -> Tuple[List[Tuple[float, float]], List[Dict[str, Any]]]:
-    """
-    Resolve a free-text cut instruction into concrete, merged (start, end) ranges.
-    Explicit timestamps are parsed directly; any leftover vague instruction text triggers
-    transcription + AI judgment. Returns (cut_ranges, transcript_used_or_empty).
-    """
-    if not cut_instruction or not cut_instruction.strip():
-        return [], []
+def resolve_plan(video_path: Path, instruction: str, out_dir: Path) -> List[Dict[str, Any]]:
+    """Transcribe the source video and plan its segments (cuts + narration)."""
+    azure_key = os.environ.get("AZURE_TTS_KEY")
+    azure_region = os.environ.get("AZURE_TTS_REGION")
+    if not azure_key or not azure_region:
+        raise ValueError("AZURE_TTS_KEY/AZURE_TTS_REGION must be set in .env to transcribe the source video.")
 
-    explicit = parse_explicit_cuts(cut_instruction)
-    transcript: List[Dict[str, Any]] = []
-
-    if _has_vague_leftover(cut_instruction):
-        azure_key = os.environ.get("AZURE_TTS_KEY")
-        azure_region = os.environ.get("AZURE_TTS_REGION")
-        if not azure_key or not azure_region:
-            raise ValueError(
-                "Cut instruction needs AI judgment (non-timestamp text found) but "
-                "AZURE_TTS_KEY/AZURE_TTS_REGION are not set in .env for transcription."
-            )
-        anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not anthropic_key:
-            raise ValueError("Cut instruction needs AI judgment but ANTHROPIC_API_KEY is not set in .env.")
-
-        transcript = transcribe_azure(video_path, azure_key, azure_region, out_dir)
-        ai_cuts = ai_judgment_cuts(transcript, cut_instruction, anthropic_key)
-    else:
-        ai_cuts = []
-
+    transcript = transcribe_azure(video_path, azure_key, azure_region, out_dir)
     total_duration = probe_duration_seconds(video_path)
-    merged = _merge_ranges(explicit + ai_cuts)
-    clamped = [(max(0.0, min(s, total_duration)), max(0.0, min(e, total_duration))) for s, e in merged]
-    valid = [(s, e) for s, e in clamped if e > s]
-    return _merge_ranges(valid), transcript
 
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if instruction and instruction.strip() and not anthropic_key:
+        raise ValueError("ANTHROPIC_API_KEY must be set in .env to apply an editing instruction.")
 
-def apply_cuts(video_path: Path, cuts: List[Tuple[float, float]], out_path: Path, out_dir: Path) -> Path:
-    """Cut the given ranges out of video_path, re-encoding for frame-accurate cuts."""
-    ffmpeg_exe = resolve_media_tool("ffmpeg")
-    total_duration = probe_duration_seconds(video_path)
-    keep = _keep_segments(cuts, total_duration)
-
-    if not keep:
-        raise ValueError("Cut instructions removed the entire video - nothing left to keep.")
-
-    safe_unlink(out_path)
-
-    if len(keep) == 1 and abs(keep[0][0]) < 1e-6 and abs(keep[0][1] - total_duration) < 1e-6:
-        subprocess.run([ffmpeg_exe, "-y", "-i", str(video_path), "-c", "copy", str(out_path)], check=True)
-        return out_path
-
-    segment_paths = []
-    for idx, (start, end) in enumerate(keep):
-        seg_path = out_dir / f"keep_segment_{idx:03}.mp4"
-        safe_unlink(seg_path)
-        subprocess.run(
-            [
-                ffmpeg_exe, "-y",
-                "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
-                "-i", str(video_path),
-                "-c:v", "libx264", "-c:a", "aac",
-                "-avoid_negative_ts", "make_zero",
-                str(seg_path),
-            ],
-            check=True,
-        )
-        segment_paths.append(seg_path)
-
-    concat_list = out_dir / "keep_segments.txt"
-    with concat_list.open("w", encoding="utf-8") as f:
-        for p in segment_paths:
-            f.write(f"file '{p.as_posix()}'\n")
-
-    subprocess.run(
-        [
-            ffmpeg_exe, "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", str(concat_list),
-            "-c:v", "libx264", "-c:a", "aac",
-            str(out_path),
-        ],
-        check=True,
-    )
-    return out_path
+    return plan_segments(transcript, instruction, total_duration, anthropic_key)
 
 
 def _chunk_script(text: str, max_chars: int = MAX_TTS_CHUNK_CHARS) -> List[str]:
@@ -291,8 +198,8 @@ def _chunk_script(text: str, max_chars: int = MAX_TTS_CHUNK_CHARS) -> List[str]:
     return chunks or [text]
 
 
-def synthesize_narration(script_text: str, settings: Dict[str, Any], out_dir: Path) -> Path:
-    """Synthesize the full narration script (chunked as needed) into one concatenated mp3."""
+def synthesize_narration(script_text: str, settings: Dict[str, Any], out_dir: Path, prefix: str = "narration") -> Path:
+    """Synthesize narration text (chunked as needed) into one concatenated mp3."""
     chunks = _chunk_script(script_text)
     provider = settings["tts_provider"]
     chunk_paths = []
@@ -308,7 +215,7 @@ def synthesize_narration(script_text: str, settings: Dict[str, Any], out_dir: Pa
             raise ValueError("Missing AZURE_TTS_KEY/AZURE_TTS_REGION in .env")
 
     for idx, chunk in enumerate(chunks):
-        chunk_path = out_dir / f"narration_chunk_{idx:03}.mp3"
+        chunk_path = out_dir / f"{prefix}_chunk_{idx:03}.mp3"
         safe_unlink(chunk_path)
         if provider == "elevenlabs":
             synthesize_elevenlabs_tts(
@@ -321,12 +228,12 @@ def synthesize_narration(script_text: str, settings: Dict[str, Any], out_dir: Pa
     if len(chunk_paths) == 1:
         return chunk_paths[0]
 
-    concat_list = out_dir / "narration_chunks.txt"
+    concat_list = out_dir / f"{prefix}_chunks.txt"
     with concat_list.open("w", encoding="utf-8") as f:
         for p in chunk_paths:
             f.write(f"file '{p.as_posix()}'\n")
 
-    narration_path = out_dir / "narration_full.mp3"
+    narration_path = out_dir / f"{prefix}_full.mp3"
     safe_unlink(narration_path)
     ffmpeg_exe = resolve_media_tool("ffmpeg")
     subprocess.run(
@@ -336,10 +243,16 @@ def synthesize_narration(script_text: str, settings: Dict[str, Any], out_dir: Pa
     return narration_path
 
 
-def reconcile_and_mux(edited_video_path: Path, narration_path: Path, final_path: Path, out_dir: Path) -> Dict[str, Any]:
+def reconcile_and_mux(
+    edited_video_path: Path,
+    narration_path: Path,
+    final_path: Path,
+    out_dir: Path,
+    tag: str = "narration",
+) -> Dict[str, Any]:
     """
     Time-stretch the narration (ffmpeg atempo) to match the edited video's duration, clamped to
-    a natural-sounding band, then mux video + adjusted narration into the final MP4.
+    a natural-sounding band, then mux video + adjusted narration into final_path.
     """
     ffmpeg_exe = resolve_media_tool("ffmpeg")
     video_duration = probe_duration_seconds(edited_video_path)
@@ -348,7 +261,7 @@ def reconcile_and_mux(edited_video_path: Path, narration_path: Path, final_path:
     tempo = narration_duration / video_duration if video_duration > 0 else 1.0
     tempo_clamped = max(ATEMPO_MIN, min(ATEMPO_MAX, tempo))
 
-    adjusted_narration = out_dir / "narration_adjusted.mp3"
+    adjusted_narration = out_dir / f"{tag}_adjusted.mp3"
     safe_unlink(adjusted_narration)
     subprocess.run(
         [
@@ -381,20 +294,54 @@ def reconcile_and_mux(edited_video_path: Path, narration_path: Path, final_path:
     }
 
 
+def render_segment(
+    video_path: Path,
+    segment: Dict[str, Any],
+    settings: Dict[str, Any],
+    out_dir: Path,
+    idx: int,
+) -> Tuple[Path, Dict[str, Any]]:
+    """Render one kept segment: cut its video span, synthesize+reconcile its narration, mux."""
+    ffmpeg_exe = resolve_media_tool("ffmpeg")
+    start, end = segment["start"], segment["end"]
+    tag = f"seg_{idx:03}"
+
+    seg_video = out_dir / f"{tag}_video.mp4"
+    safe_unlink(seg_video)
+    subprocess.run(
+        [
+            ffmpeg_exe, "-y",
+            "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
+            "-i", str(video_path),
+            "-c:v", "libx264", "-c:a", "aac",
+            "-avoid_negative_ts", "make_zero",
+            str(seg_video),
+        ],
+        check=True,
+    )
+
+    narration_path = synthesize_narration(segment["narration"], settings, out_dir, prefix=f"{tag}_narr")
+
+    seg_final = out_dir / f"{tag}_final.mp4"
+    mux_info = reconcile_and_mux(seg_video, narration_path, seg_final, out_dir, tag=tag)
+    return seg_final, mux_info
+
+
 def run_video_pipeline(
     video_path: str,
-    script_text: str,
-    cut_instruction: str,
+    instruction: str,
     out_dir: str,
     settings: Optional[Dict[str, Any]] = None,
     progress_cb: Optional[Callable[[str, int, str], None]] = None,
+    segments_override: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Runs:
-    - Resolve cut instructions (explicit timestamps + AI judgment via transcript)
-    - Apply cuts to the source video
-    - Generate new narration audio from script_text
-    - Reconcile durations (atempo) and mux into final.mp4
+    - Transcribe the source video's original narration (unless segments_override is supplied,
+      e.g. from a prior /redub/preview call - then planning is skipped entirely)
+    - Plan segments: what to cut, what to keep, and what narration to speak for each kept span
+    - Render each kept segment: cut video span, synthesize+reconcile its narration, mux
+    - Concatenate all rendered segments into final.mp4
     """
     video_path_obj = Path(video_path).resolve()
     out_dir_path = Path(out_dir).resolve()
@@ -408,42 +355,65 @@ def run_video_pipeline(
     total_start = time.perf_counter()
     final_video = out_dir_path / "final.mp4"
 
-    if not script_text or not script_text.strip():
-        raise ValueError("No narration script provided.")
+    if segments_override is not None:
+        segments = segments_override
+        plan_seconds = 0.0
+    else:
+        report("plan", 15, "Transcribing original narration and planning edits")
+        plan_start = time.perf_counter()
+        segments = resolve_plan(video_path_obj, instruction, out_dir_path)
+        plan_seconds = round(time.perf_counter() - plan_start, 2)
 
-    report("cuts", 10, "Resolving cut instructions")
-    cuts_start = time.perf_counter()
-    cut_ranges, _transcript = resolve_cuts(video_path_obj, cut_instruction, out_dir_path)
-    cuts_seconds = round(time.perf_counter() - cuts_start, 2)
+    kept_segments = [s for s in segments if s.get("keep")]
+    if not kept_segments:
+        raise ValueError("The plan kept no segments of the video - nothing to render.")
 
-    report("editing", 30, "Applying cuts to source video")
-    edit_start = time.perf_counter()
-    edited_video = out_dir_path / "edited_video.mp4"
-    apply_cuts(video_path_obj, cut_ranges, edited_video, out_dir_path)
-    edit_seconds = round(time.perf_counter() - edit_start, 2)
+    report("render", 40, f"Rendering {len(kept_segments)} segment(s)")
+    render_start = time.perf_counter()
+    rendered_paths = []
+    per_segment_mux_info = []
+    step = 40 / max(1, len(kept_segments))
+    for idx, seg in enumerate(kept_segments):
+        report("render", int(40 + idx * step), f"Rendering segment {idx + 1}/{len(kept_segments)}")
+        seg_path, mux_info = render_segment(video_path_obj, seg, pipeline_settings, out_dir_path, idx)
+        rendered_paths.append(seg_path)
+        per_segment_mux_info.append(mux_info)
+    render_seconds = round(time.perf_counter() - render_start, 2)
 
-    report("narration", 55, f"Generating {pipeline_settings['tts_provider']} narration")
-    tts_start = time.perf_counter()
-    narration_path = synthesize_narration(script_text, pipeline_settings, out_dir_path)
-    tts_seconds = round(time.perf_counter() - tts_start, 2)
-
-    report("mux", 85, "Reconciling durations and muxing final video")
-    mux_start = time.perf_counter()
-    mux_info = reconcile_and_mux(edited_video, narration_path, final_video, out_dir_path)
-    mux_seconds = round(time.perf_counter() - mux_start, 2)
+    report("concat", 90, "Concatenating segments into final video")
+    concat_start = time.perf_counter()
+    safe_unlink(final_video)
+    if len(rendered_paths) == 1:
+        shutil.copy(rendered_paths[0], final_video)
+    else:
+        concat_list = out_dir_path / "final_segments.txt"
+        with concat_list.open("w", encoding="utf-8") as f:
+            for p in rendered_paths:
+                f.write(f"file '{p.as_posix()}'\n")
+        ffmpeg_exe = resolve_media_tool("ffmpeg")
+        subprocess.run(
+            [
+                ffmpeg_exe, "-y",
+                "-f", "concat", "-safe", "0",
+                "-i", str(concat_list),
+                "-c:v", "libx264", "-c:a", "aac",
+                str(final_video),
+            ],
+            check=True,
+        )
+    concat_seconds = round(time.perf_counter() - concat_start, 2)
 
     total_seconds = round(time.perf_counter() - total_start, 2)
 
     return {
         "final_video": str(final_video),
         "telemetry": {
-            "cuts_seconds": cuts_seconds,
-            "edit_seconds": edit_seconds,
-            "tts_seconds": tts_seconds,
-            "mux_seconds": mux_seconds,
+            "plan_seconds": plan_seconds,
+            "render_seconds": render_seconds,
+            "concat_seconds": concat_seconds,
             "total_seconds": total_seconds,
         },
-        "cuts": [{"start": round(s, 2), "end": round(e, 2)} for s, e in cut_ranges],
-        "mux_info": mux_info,
+        "segments": segments,
+        "segment_mux_info": per_segment_mux_info,
         "settings": pipeline_settings,
     }

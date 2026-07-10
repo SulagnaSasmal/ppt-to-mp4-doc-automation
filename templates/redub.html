@@ -35,7 +35,7 @@
   <!-- Card Header -->
   <div class="card-header">
     <h1 class="card-title">Redub a Video</h1>
-    <p class="card-subtitle">Upload an MP4 that already has its own narration. We'll cut it per your instructions and replace the audio entirely with a new AI voice reading your script.</p>
+    <p class="card-subtitle">Upload an MP4 that already has its own narration. The AI reads its original narration, follows your instructions to decide what to cut and what to say, and speaks the result in a new AI voice.</p>
   </div>
 
   <form id="redubForm" enctype="multipart/form-data">
@@ -51,22 +51,14 @@
       <div id="selected-file" class="selected-file hidden"></div>
     </div>
 
-    <!-- ── Script + Cut Instruction ── -->
+    <!-- ── Instruction ── -->
     <div class="control-grid" style="grid-template-columns: 1fr;">
       <div class="control-group">
         <label>
           <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Narration Script (full replacement text)
+          Instructions (optional)
         </label>
-        <textarea id="script-text" rows="8" placeholder="Paste the full narration script to read over the video. The original video's own audio is discarded entirely."></textarea>
-      </div>
-
-      <div class="control-group">
-        <label>
-          <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-          Cut Instructions (optional)
-        </label>
-        <textarea id="cut-instruction" rows="3" placeholder='e.g. "cut 0:45-1:10" for exact timestamps, or "remove the awkward pause after the intro" for AI judgment (needs a transcript).'></textarea>
+        <textarea id="instruction" rows="4" placeholder='Describe what to cut, rewrite, or keep, e.g. "cut the boring pricing section and make the intro punchier." The AI reads the video&#39;s own original narration and follows your instructions to write the new script. Leave blank to just redub the video as-is in a new voice, unchanged.'></textarea>
       </div>
     </div>
 
@@ -122,7 +114,7 @@
       </button>
       <button id="preview-btn" type="button" class="btn btn-secondary">
         <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        Preview Cuts
+        Preview Plan
       </button>
       <button id="convert-btn" type="submit" class="btn btn-primary">
         <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -246,8 +238,8 @@ const ttsProviderSel  = document.getElementById("tts-provider");
 const azureVoiceGroup = document.getElementById("azure-voice-group");
 const elVoiceGroup    = document.getElementById("elevenlabs-voice-group");
 const elVoiceIdInput  = document.getElementById("elevenlabs-voice-id");
-const scriptTextEl    = document.getElementById("script-text");
-const cutInstructionEl = document.getElementById("cut-instruction");
+const instructionEl   = document.getElementById("instruction");
+let currentSegments   = null;
 
 /* --- Range slider sync --- */
 function syncRate() {
@@ -311,10 +303,10 @@ function readSettings() {
 function buildFormData() {
   const fd = new FormData();
   if (fileInput.files[0]) fd.append("video", fileInput.files[0]);
-  fd.append("script_text", scriptTextEl.value);
-  fd.append("cut_instruction", cutInstructionEl.value);
+  fd.append("instruction", instructionEl.value);
   const s = readSettings();
   Object.keys(s).forEach(k => fd.append(k, s[k]));
+  if (currentSegments) fd.append("segments_json", JSON.stringify(currentSegments));
   return fd;
 }
 
@@ -342,40 +334,49 @@ uploadDropZone.addEventListener("drop", ev => {
   fileInput.files = files;
   showSelectedFile(files[0]);
 });
-fileInput.addEventListener("change", () => showSelectedFile(fileInput.files?.[0]));
+fileInput.addEventListener("change", () => { showSelectedFile(fileInput.files?.[0]); currentSegments = null; });
+instructionEl.addEventListener("input", () => { currentSegments = null; });
 
-/* --- Preview cuts --- */
+/* --- Preview plan --- */
 function renderPreview(data) {
   previewPanel.classList.remove("hidden");
   previewPanel.open = true;
 
+  currentSegments = data.segments;
+  const cutCount = data.segments.filter(s => !s.keep).length;
+
   previewMeta.innerHTML = [
     `<span class="meta-chip">Source: ${data.total_duration}s</span>`,
-    `<span class="meta-chip">Cut ranges: ${data.cuts.length}</span>`,
+    `<span class="meta-chip">Cut segments: ${cutCount}</span>`,
     `<span class="meta-chip">Estimated kept: ${data.estimated_kept_duration}s</span>`
   ].join("");
 
-  previewNotes.innerHTML = data.cuts.length
-    ? data.cuts.map(c => `<div class="note-item"><div class="note-head">Cut</div><div class="note-text">${c.start}s → ${c.end}s</div></div>`).join("")
-    : '<div class="note-item">No cuts resolved from the instruction (or no instruction given) - the full video will be kept.</div>';
+  previewNotes.innerHTML = data.segments.map(s => {
+    const range = `${s.start.toFixed(1)}s → ${s.end.toFixed(1)}s`;
+    if (!s.keep) {
+      return `<div class="note-item"><div class="note-head">Cut</div><div class="note-text">${range}</div></div>`;
+    }
+    const text = (s.narration || "").replaceAll("<", "&lt;");
+    return `<div class="note-item"><div class="note-head">Keep — ${range}</div><div class="note-text">${text}</div></div>`;
+  }).join("") || '<div class="note-item">No plan resolved.</div>';
 }
 
 previewBtn.addEventListener("click", async () => {
   const file = fileInput.files[0];
   if (!file) { alert("Please select an MP4 file first."); return; }
   previewBtn.disabled = true;
-  previewBtn.textContent = "Resolving…";
+  previewBtn.textContent = "Planning…";
   try {
     const fd = new FormData();
     fd.append("video", file);
-    fd.append("cut_instruction", cutInstructionEl.value);
+    fd.append("instruction", instructionEl.value);
     const res = await fetch("/redub/preview", { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok) { alert(data.detail || "Preview failed"); return; }
     renderPreview(data);
   } finally {
     previewBtn.disabled = false;
-    previewBtn.textContent = "Preview Cuts";
+    previewBtn.textContent = "Preview Plan";
   }
 });
 
@@ -407,10 +408,9 @@ function setTelemetry(t) {
   if (!bar) return;
   if (!t || !t.total_seconds) { bar.innerHTML = ""; return; }
   bar.innerHTML = [
-    `<span class="t-item"><span class="t-label">Cuts:</span><span class="t-value">${t.cuts_seconds ?? '–'}s</span></span>`,
-    `<span class="t-item"><span class="t-label">Editing:</span><span class="t-value">${t.edit_seconds ?? '–'}s</span></span>`,
-    `<span class="t-item"><span class="t-label">TTS:</span><span class="t-value">${t.tts_seconds ?? '–'}s</span></span>`,
-    `<span class="t-item"><span class="t-label">Mux:</span><span class="t-value">${t.mux_seconds ?? '–'}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Plan:</span><span class="t-value">${t.plan_seconds ?? '–'}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Render:</span><span class="t-value">${t.render_seconds ?? '–'}s</span></span>`,
+    `<span class="t-item"><span class="t-label">Concat:</span><span class="t-value">${t.concat_seconds ?? '–'}s</span></span>`,
     `<span class="t-item"><span class="t-label">Total:</span><span class="t-value">${t.total_seconds}s</span></span>`
   ].join("");
 
@@ -423,7 +423,6 @@ redubForm.addEventListener("submit", async ev => {
   ev.preventDefault();
   const file = fileInput.files[0];
   if (!file) { alert("Please select an MP4 file."); return; }
-  if (!scriptTextEl.value.trim()) { alert("Please enter a narration script."); return; }
 
   stepperSection.classList.remove("hidden");
   successToast.classList.remove("visible");
@@ -562,6 +561,7 @@ function resetTask() {
   previewPanel.open = false;
   previewMeta.innerHTML = "";
   previewNotes.innerHTML = "";
+  currentSegments = null;
 
   redubForm.reset();
   showSelectedFile(null);
