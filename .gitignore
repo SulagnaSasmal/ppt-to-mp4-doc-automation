@@ -15,6 +15,9 @@ dist/
 # Logs
 *.log
 
+# Generated/local voice previews
+static/voice_samples/
+
 # Local secrets
 .env
 # Job output folders
